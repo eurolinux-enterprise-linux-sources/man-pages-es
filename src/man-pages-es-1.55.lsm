@@ -1,0 +1,13 @@
+Begin3
+Title:          Spanish man pages for Linux, sections 2, 3, 4, 5 and 7
+Version:        1.55
+Entered-date:   2005-06-07
+Description:    Translation into Spanish of the English man-pages-1.55 for Linux
+Keywords:       man pages
+Author:         several
+Maintained-by:  Juan Piernas Cánovas <piernas at ditec.um.es>
+Primary-site:   http://www.ditec.um.es/~piernas/manpages-es
+                668k man-pages-es-1.55.tar.bz2
+Alternate-site: http://es.tldp.org
+Copying-policy: several; all freely distributable if nroff source included
+End

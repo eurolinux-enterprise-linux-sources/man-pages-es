@@ -1,0 +1,362 @@
+.\" Copyright (c) 1996 Eric S. Raymond <esr@thyrsus.com>
+.\"                and Andries Brouwer <aeb@cwi.nl>
+.\"
+.\" This is free documentation; you can redistribute it and/or
+.\" modify it under the terms of the GNU General Public License as
+.\" published by the Free Software Foundation; either version 2 of
+.\" the License, or (at your option) any later version.
+.\"
+.\" This is combined from many sources, including notes by aeb and
+.\" research by esr.  Portions derive from a writeup by Roman Czyborra.
+.\"
+.\" Last changed by David Starner <dstarner98@aasaa.ofe.org>.
+.\"
+.\" Translated into Spanish on 03 January 1998 by Gerardo Aburruzaga
+.\"				  García <gerardo.aburruzaga at uca.es>
+.\"
+.\" Translation revised Sun Aug 16 1998 by Juan Piernas <piernas at ditec.um.es>
+.\" Translation revised Sat Apr 22 2000 by Juan Piernas <piernas at ditec.um.es>
+.\" Traducción revisada por Miguel Pérez Ibars <mpi79470 en alu.um.es> el 20-marzo-2005
+.\" Translation revised Fri May 13 2005 by Juan Piernas <piernas at ditec.um.es>
+.\"
+.TH CHARSETS 7 "7 mayo 2001" "Linux" "Manual del Programador de Linux"
+.SH NOMBRE
+charsets \- internacionalización y conjuntos de caracteres desde el
+punto de vista del programador
+.SH DESCRIPCIÓN
+Linux es un sistema operativo internacional. Varias de sus utilidades
+y controladores (``drivers'') de dispositivos (incluyendo el de la consola) admiten
+conjuntos de caracteres multilingües, que incluyen letras del alfabeto
+latino con marcas diacríticas, acentos y ligaduras, y alfabetos enteros
+no latinos incluyendo el griego, cirílico, árabe y hebreo.
+.LP
+Esta página de manual presenta una visión de los estándares de
+conjuntos de caracteres desde el punto de vista del programador y cómo
+encajan todos juntos en Linux. Los estándares que se tratan incluyen el
+ASCII, ISO 8859, KOI8-R, Unicode, ISO 2022 e ISO 4873. Vamos a hacer
+enfásis en aquellos conjuntos de caracteres que se usan realmente como
+conjuntos de caracteres de localización, no en los miles de aquellos
+que podemos encontrar en datos procedentes de otros sistemas.
+.LP
+Una lista completa de los conjuntos de caracteres usados en una
+localización oficialmente soportada en glibc 2.2.3 es:
+ISO-8859-{1,2,3,5,6,7,8,9,13,15}, CP1251, UTF-8, EUC-{KR,JP,TW},
+KOI8-{R,U}, GB2312, GB18030, GBK, BIG5, BIG5-HKSCS y TIS-620 (sin
+ningún orden particular.) (El rumano se puede cambiar al ISO-8859-16.)
+
+.SH ASCII
+ASCII (American Standard Code For Information Interchange, Código Estándar
+Americano para el Intercambio de Información) es el conjunto de caracteres
+original de 7 bits, diseñado inicialmente para el inglés americano.
+Actualmente se describe en el estándar ECMA-6.
+.LP
+Existen varias variantes del ASCII de 7 bits que reemplazan el signo
+del dolar por otros símbolos monetarios y caracteres de puntuación con
+caracteres alfabéticos no ingleses para cubrir el alemán, frances,
+español y otros. No se recomienda usar ningún de ellos; la libc de GNU
+no soporta localizaciones cuyos conjuntos de caracteres no sean
+verdaderos superconjuntos del ASCII. (Estos conjuntos también se
+conocen como ISO-646, un pariente cercano del ASCII que permite
+reemplazar estos caracteres.)
+.LP
+Como Linux fue escrito para equipos diseñados en los EE.UU., admite
+ASCII de modo nativo.
+
+.SH ISO 8859
+ISO 8859 es una serie de 15 conjuntos de caracteres de 8 bits, los
+cuales tienen como su primera mitad (7 bits) el US ASCII, caracteres
+de control invisibles en las posiciones 128 a 159, y 96 gráficos fijos
+desde la posición 160 hasta la 255.
+.LP
+De éstos, el más importante es el ISO 8859-1 (Latin-1). Es admitido de
+modo nativo por el controlador de consola de Linux, muy bien admitido
+en X11R6 y es el conjunto de caracteres base de HTML.
+.LP
+El soporte de consola para los otros conjuntos de caracteres 8859 está
+disponible en Linux a través de utilidades de usuario (como
+.BR setfont (8)) 
+.\" // some distributions still have the deprecated consolechars
+que modifican las asociaciones de teclas y la tabla de gráficos EGA/VGA y
+emplean la tabla de tipos de letra de "correspondencia de usuario" en el
+controlador de consola.
+.LP
+Aquí se presentan breves descripciones de cada conjunto:
+.TP
+8859-1 (Latin-1)
+Latin-1 cubre la mayoría de lenguajes de Europa Occidental como el
+albanés, catalán, danés, neerlandés, inglés, feroés, finés, francés,
+alemán, gallego, gaélico, islandés, italiano, noruego, portugués,
+español y sueco. La falta de las ligaduras neerlandesa ij, francesa oe
+y las comillas antiguas ,,alemanas`` se considera tolerable. 
+
+.TP
+8859-2 (Latin-2)
+Latin-2 es el soporte para la mayoría de las lenguas eslavas y de
+Centro-Europa que se escriben con caracteres latinos: checo, alemán,
+húngaro, polaco, rumano, croata, eslovaco y esloveno.
+
+.TP
+8859-3 (Latin-3)
+Latin-3 es popular entre los autores de esperanto, gallego y maltés.
+(El turco ahora se escribe con el conjunto 8859-9.)
+.TP
+8859-4 (Latin-4)
+Latin-4 introdujo letras para el estonio, letón y
+lituano. Esencialmente está obsoleto; vea el 8859-10 (Latin-6) y 8859-13
+(Latin 7).
+.TP
+8859-5
+Letras cirílicas para el búlgaro, bielorruso, macedonio, ruso, serbio
+y ucraniano. Los ucranianos leen la letra `ghe' con palote como `heh'
+y necesitarían una `ghe' con plumada ascendente para escribir una
+correcta `ghe'. Vea la discusión sobre el KOI8-R más abajo.
+.TP
+8859-6
+Para el árabe. La tabla de glifos 8859-6 es un tipo fijo de formas de
+letra separadas, pero un mecanismo de visualización correcto debería
+combinar éstas usando las formas iniciales, medias y finales apropiadas.
+.TP
+8859-7
+Para el griego moderno.
+.TP
+8859-8
+Para el hebreo moderno sin ``niqud'' (signos de puntuación).
+Los ``niqud'' y el hebreo bíblico ``oficial'' se encuentran fuera del
+ámbito de este conjunto de caracteres; en Linux se prefiere la
+codificación UTF-8 para esto
+.TP
+8859-9 (Latin-5)
+Ésta es una variante del Latin-1 que reemplaza letras islandesas
+con otras turcas.
+.TP
+8859-10 (Latin-6) 
+El Latin 6 añade las últimas letras del inuit (esquimal de
+Groenlandia) y del sami (lapón) que faltaban en el Latin 4 para cubrir
+toda el área nórdica. RFC 1345 listaba un `latin6' preliminar y
+diferente. El sami skolt aún necesita unos pocos acentos más que éstos.
+.TP
+8859-11
+Esto sólo existe como borrador de un estándar que se rechazó. El
+borrador era idéntico a TIS-620, que se usa en Linux para el
+tailandés.
+.TP
+8859-12
+Este conjunto no existe. Aunque se ha sugerido su uso para el
+vietnamita, éste no cabe en los 96 caracteres (independientes) que
+ofrece el ISO 8859. En Linux se prefiere el conjunto de caracteres
+UTF-8 para el vietnamita.
+.TP
+8859-13 (Latin-7)
+Para las lenguas de la Ribera del Báltico; en particular, incluye
+los caracteres letones que no se encuentran en Latin-4.
+.TP
+8859-14 (Latin-8)
+Éste es el conjunto de caracteres celta, que cubre el gaélico y el
+galés. También contiene los caracteres punteados que necesita el
+irlandés antiguo.
+.TP
+8859-15 (Latin-9)
+Éste añade el signo del Euro y las letras francesas y finlandesas que
+se echaban de menos en Latin-1.
+.TP
+8859-16 (Latin-10)
+Este conjunto abarca muchos de los idiomas que cubre el 8859-2 y
+soporta el rumano de forma más completa que aquel.
+.SH KOI8-R
+El KOI8-R es un conjunto de caracteres no ISO popular en Rusia. La
+primera mitad es el US ASCII; la segunda es un conjunto de caracteres
+cirílico algo mejor diseñado que el ISO 8859-5. KOI8-U es un conjunto
+de caracteres común, basado en KOI8-R, que tiene un mejor soporte para
+el ucraniano. A diferencia de las series ISO-8859, ninguno de estos
+conjuntos es compatible con el estándar ISO-2022.
+.LP
+El soporte de consola para el KOI8-R está disponible en Linux a través
+de utilidades de usuario (como
+.BR setfont (8)) 
+que modifican las asociaciones de teclas y la tabla de gráficos EGA y
+emplean la tabla de tipos de letra de "correspondencia de usuario" en el
+controlador de consola.
+.\" Thanks to Tomohiro KUBOTA for the following sections about
+.\" national standards.
+.SH JIS X 0208
+JIS X 0208 es un conjunto nacional estándar de caracteres japoneses.
+Aunque hay algunos conjuntos nacionales estándares más de caracteres
+japoneses (como JIS X 0201, JIS X 0212 y JIS X 0213), éste es el
+más importante. Los caracteres se proyectan en una matriz de 94x94
+celdas de 2 bytes, donde cada byte se encuentra en el rango 0x21-0x7e.
+Dese cuenta que JIS X 0208 es un conjunto de caracteres, no una
+codificación. Esto significa que el propio JIS X 0208 no se usa para
+expresar datos de texto. JIS X 0208 se usa como un componente para
+construir codificaciones como EUC-JP, Shift_JIS y ISO-2022-JP. EUC-JP
+es la codificación más importante para Linux e incluye ASCII IS y JIS
+X 0208. En EUC-JP, los caracteres JIS X 0208 se expresan con 2 dos
+bytes, cada uno de los cuales es el código JIS X 0208 más 0x80.
+
+.SH KS X 1001
+KS X 1001 es un conjunto nacional estándar de caracteres coreanos.
+Al igual que JIS X 0208, los caracteres se proyectan en una matriz de
+94x94 celdas de 2 bytes. KS X 1001 se usa como JIS X 0208, como un
+componente para construir codificaciones tales como EUC-KR, Johab e
+ISO-2022-KR. EUC-KR es la codificación más importante para Linux e
+incluye ASCII US y KS X 1001. KS C 5601 es el antiguo nombre de
+KS X 1001.
+
+.SH GB 2312
+GB 2312 es un conjunto nacional estándar de caracteres para el chino
+continental que se usa para expresar chino simplificado. Al igual que
+JIS X 0208, los caracteres se proyectan en una matriz de 94x94 celdas
+de dos bytes que se usa para construir la codificación EUC-CN. EUC-CN
+es la codificación más importante para Linux e incluye ASCII US y
+GB 2312. Dese cuenta que EUC-CN frecuentemente se identifica como GB,
+GB 2312 o CN-GB.
+
+.SH Big5
+Big5 es un conjunto de caracteres popular en Taiwan para expresar
+chino tradicional. (Big5 es tanto un conjunto de caracteres como una
+codificación.) Es un superconjunto del ASCII US. Los caracteres no
+ASCII se expresan con dos bytes. Los bytes 0xa1-0xfe se usan como
+primer byte en los caracteres de dos bytes. Big5 y sus extensiones se
+usan ampliamente en Taiwan y Hong Kong. No cumple con el estándar
+ISO-2022.
+
+.SH TIS 620
+TIS 620 es un conjunto nacional estándar de caracteres tailandeses y
+un superconjunto del ASCII US. Al igual que las series ISO 8859, los
+caracteres tailandeses se proyectan en el rango 0xa1-0xfe. TIS 620 es
+el único conjunto de caracteres comunmente usado en Linux, además de
+UTF-8, para tener caracteres de combinación.
+
+.SH UNICODE
+Unicode (ISO 10646) es un estándar cuyo objetivo es representar
+inequívocamente cada carácter conocido en cada lenguaje humano.
+La estructura de Unicode admite 20'1 bits para codificar cada
+caracter. Sin embargo, ya que la mayoría de los computadores no
+incluyen enteros de 20'1 bits, normalmente Unicode se codifica
+internamente mediante enteros de 32 bits y, o bien una serie de enteros
+de 16 bits (UTF-16) (que necesita dos enteros de 16 bits sólo cuando
+se codifican ciertos caracteres poco comunes), o bien una serie de
+bytes de 8 bits (UTF-8). Hay información sobre Unicode en el URL 
+<http://www.unicode.com>.
+.LP
+Linux representa Unicode empleando el Formato de Transformación Unicode
+de 8 bits (UTF-8). UTF-8 es una codificación de Unicode de longitud
+variable. Emplea 1 byte para codificar 7 bits, 2 bytes para 11 bits, 3
+bytes para 16 bits, 4 bytes para 21 bits, 5 bytes para 26 bits, y 6
+bytes para 31 bits.
+.LP
+Sean 0, 1, x el 0, el 1 ó un bit arbitrario. Un byte 0xxxxxxx
+representa el carácter Unicode 00000000 0xxxxxxx que codifica el mismo
+símbolo que el ASCII 0xxxxxxx.  Así, ASCII va sin cambio alguno dentro
+de UTF-8, y la gente que emplea ASCII no nota ningún cambio: ni en el
+código ni en tamaños de fichero.
+.LP
+Un byte 110xxxxx es el comienzo de un código de 2 bytes, y 110xxxxx 10yyyyyy
+se ensambla en 00000xxx xxyyyyyy.  Un byte 1110xxxx es el comienzo de
+un código de 3 bytes, y 1110xxxx 10yyyyyy 10zzzzzz se ensambla en
+xxxxyyyy yyzzzzzz.  (Cuando se emplea UTF-8 para codificar el ISO
+10646 de 31 bits, esta progresión continúa hasta códigos de 6 bytes.)
+.LP
+Para la mayoría de la gente que usa los conjuntos de caracteres ISO-8859, esto significa
+que los caracteres fuera de ASCII se codifican ahora con dos bytes. Esto tiende a expandir
+los ficheros de texto ordinarios en sólo un 1 o 2%. Para el ruso y el griegos, esto
+expande los ficheros de texto ordenarios en un 100%, ya que el texto en estos idiomas se
+encuentra en su mayor parte fuera de ASCII. Para los usuarios japoneses esto significa que
+los códigos de 16 bits de uso común actualmente necesitarán tres bytes. Aunque hay
+conversiones algorítmicas desde algunos conjuntos de caracteres (esp. ISO-8859-1) a
+Unicode, una conversión general requiere andar con tablas de conversión que puede ser
+bastante grandes para los códigos de 16 bits.
+.LP
+Observe que UTF-8 es auto-sincronizante: 10xxxxxx es una cola, y
+cualquier otro byte es la cabeza de un código. Observe que de la única
+manera que los bytes ASCII aparecen en un flujo UTF-8 es como ellos
+mismos. En particular, no hay NULs o '/'s incluidos que formen parte de algún
+código más grande. 
+.LP
+Puesto que ASCII, y, en particular, NUL y '/', permanecen
+inalterados, el núcleo no se entera de que se está empleando UTF-8. No
+le importa en absoluto para qué son los bytes que está manejando.
+.LP
+La representación de los flujos de datos Unicode se maneja normalmente
+a través de tablas de `subtipo' que hacen corresponder un subconjunto
+de Unicode a glifos. Internamente el núcleo emplea Unicode para
+describir el subtipo de letra cargada en RAM de vídeo. Esto significa
+que en el modo UTF-8 uno puede emplear un conjunto de caracteres con
+512 símbolos diferentes. Esto no basta para el japonés, chino ni
+coreano, pero es bastante para la mayoría de otros propósitos.
+.LP
+Por el momento, el manejador de consola no maneja caracteres de
+combinación. Por lo que el tailandés, el siux y otros alfabetos que
+necesitan caracteres de combinación no pueden ser manejados en la
+consola.
+
+.SH "ISO 2022 Y ISO 4873"
+Los estándares ISO 2022 y 4873 describen un modelo de control de tipo
+de letra basado en la VT100. Este modelo es (parcialmente) admitido
+por el núcleo de Linux y por
+.BR xterm (1).
+Es popular en Japón y Corea.
+.LP
+Hay 4 conjuntos de caracteres gráficos, llamados G0, G1, G2 y G3,
+y uno de ellos es el conjunto de caracteres actual para los códigos
+con el bit más alto a 0 (inicialmente G0), y uno de ellos es el
+conjunto de caracteres actual para los códigos con el bit más alto a 1
+(inicialmente G1). Cada conjunto de caracteres gráfico tiene 94 ó 96
+caracteres, y es esencialmente un conjunto de caracteres de 7
+bits. Emplea códigos bien entre 040-0177 (041-0176) o bien entre
+0240-0377 (0241-0376).
+G0 siempre tiene de tamaño 94  y emplea códigos en el rango 041-0176.
+.LP
+El cambio entre los conjuntos de caracteres se realiza empleando las
+funciones de cambio
+^N (SO o LS1), ^O (SI o LS0), ESC n (LS2), ESC o (LS3),
+ESC N (SS2), ESC O (SS3), ESC ~ (LS1R), ESC } (LS2R), ESC | (LS3R).
+La función LS\fIn\fP hace que el conjunto de caracteres G\fIn\fP sea
+el actual para los códigos con el bit más alto a 0.
+La función LS\fIn\fPR hace que el conjunto de caracteres G\fIn\fP sea
+el actual para los códigos con el bit más alto a 1.
+La función SS\fIn\fP hace que el conjunto de caracteres G\fIn\fP
+(\fIn\fP=2 ó 3) sea el actual para el siguiente carácter solamente
+(tenga lo que tenga su bit más alto).
+.LP
+Un conjunto de 94 caracteres se designa como el conjunto de caracteres
+G\fIn\fP por una secuencia de escape ESC ( xx (para G0), ESC ) xx
+(para G1), ESC * xx (para G2), ESC + xx (para G3), donde xx es un
+símbolo o un par de símbolos del Registro Internacional de Conjuntos
+de Caracteres Codificados ISO 2375.
+Por ejemplo, ESC ( @ selecciona el conjunto de caracteres ISO 646 como
+el G0, ESC ( A selecciona el conjunto de caracteres estándar de
+R.U. (con la libra esterlina en lugar del signo numeral #), ESC ( B
+selecciona el ASCII (con el dólar $ en lugar del símbolo monetario ¤),
+ESC ( M selecciona un conjunto de caracteres para lenguas africanas,
+ESC ( ! selecciona el conjunto de caracteres cubano, etc. etc. etc.
+.LP
+Un conjunto de 96 caracteres se designa como el conjunto de caracteres
+G\fIn\fP por una secuencia de escape ESC - xx (para G1), ESC . xx
+(para G2) o ESC / xx (para G3).
+Por ejemplo, ESC - G selecciona el alfabeto hebreo como el G1.
+.LP
+Un conjunto de caracteres multibyte se designa como el conjunto de
+caracteres G\fIn\fP por una secuencia de escape ESC $ xx o ESC $ ( xx
+(para G0),
+ESC $ ) xx (para G1), ESC $ * xx (para G2), ESC $ + xx (para G3).
+Por ejemplo, ESC $ ( C selecciona el conjunto de caracteres coreano
+para G0. El conjunto de caracteres japonés seleccionado por ESC $ B
+tiene una versión más reciente seleccionada por ESC & @ ESC $ B.
+.LP
+ISO 4873 estipula un uso más reducido de conjuntos de caracteres,
+donde G0 está fijo (siempre ASCII), de modo que G1, G2 y G3 sólo
+pueden ser llamados para códigos con el bit más alto a 1.
+En particular, ^N y ^O ya no se usan más, ESC ( xx sólo puede
+emplearse con xx=B y ESC ) xx, ESC * xx, ESC + xx
+son equivalentes a ESC - xx, ESC . xx, ESC / xx, respectivamente.
+
+.SH "VÉASE TAMBIÉN"
+.BR console (4),
+.BR console_ioctl (4),
+.BR console_codes (4),
+.BR ascii (7),
+.BR iso_8859_1 (7),
+.BR unicode (7),
+.BR utf-8 (7)
+\"  LocalWords:  glifos multilingües KOI Unicode Latin HTML feroés bielorruso
+\"  LocalWords:  serbio ucraniano ucranianos glifo URL UTF UTF ESC ESC

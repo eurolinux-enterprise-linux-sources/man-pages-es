@@ -1,0 +1,69 @@
+.\" Copyright (c) 2000 Andries Brouwer <aeb@cwi.nl>
+.\" based on work by Rik Faith <faith@cs.unc.edu>
+.\" and Mike Battersby <mike@starbug.apana.org.au>.
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\"
+.\" Revisado por Miguel Pérez Ibars <mpi79470@alu.um.es> el 1-diciembre-2004
+.\"
+.TH SIGNAL 2 "28 abril 2000" "Linux 2.2" "Manual del Programador de Linux"
+.SH NOMBRE
+signal \- manejo de señales en ANSI C
+.SH SINOPSIS
+.B #include <signal.h>
+.sp
+.B typedef void (*sighandler_t)(int);
+.sp
+.BI "sighandler_t signal(int " signum ", sighandler_t " handler );
+.SH DESCRIPCIÓN
+La llamada al sistema
+.BR signal ()
+instala un nuevo manejador de señales para la señal con número
+.IR signum .
+El manejador de señales queda establecido a
+.I sighandler
+que puede ser una función especificada por el usuario o bien
+.B SIG_IGN
+o
+.BR SIG_DFL .
+
+Cuando llega una señal con número
+.I signum
+ocurre lo siguiente.
+Si el manejador correspondiente está establecido a
+.BR SIG_IGN ,
+la señal es ignorada.
+Si el manejador está establecido a
+.BR SIG_DFL ,
+se realiza la acción por defecto asociada a la señal (vea
+.BR signal (7)).
+Finalmente, si el manejador está establecido a una función
+.I sighandler
+lo primero que se hace es o bien restablecer el manejador
+a SIG_DFL o un bloqueo de la señal que depende de la implementación,
+invocando después a
+.I sighandler
+con el argumento
+.IR signum .
+
+Usar una función manejadora de señales para una señal
+se llama "atrapar la señal".
+Las señales

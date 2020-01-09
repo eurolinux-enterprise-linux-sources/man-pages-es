@@ -1,0 +1,72 @@
+.\" Copyright (C) 1996 Andries Brouwer (aeb@cwi.nl)
+.\"
+.\" Esto es documentación libre ; Tu puedes redistribuirla y/o
+.\" modificarla bajos los términos de las licencias públicas generales de GNU
+.\" publicados por la Fundación de Libre Software ; ambos versiones 2 de
+.\" la Licencia, o (dependiendo de tí)cualquier versión posterior.
+.\"
+.\" Las referencias de las licencias públicas generales de GNU referentes al "código objeto"
+.\" y "ejecutables" están siendo interpretadas como la salida de cualquier
+.\" documento formateado o sistema tipografiado, incluyendo
+.\" intermediación y salidas impresas.
+.\"
+.\" Este manual es distribuído con la esperanza de su buen uso,
+.\" pero SIN NINGUN TIPO DE GARANTIAS ; sin siquiera las garantías implicadas de
+.\" COMERCIABILIDAD o AMPTITUD PARA UN PROPOSITO PATICULAR.
+.\" Ver la Licencia Pública General de GNU para más detalles.
+.\"
+.\" Tu deberás recibir una copia de la Licencia Pública General
+.\" de GNU junto con este manual ; si no, escribe a Free
+.\" Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111,
+.\" USA.
+.\"
+.\" Modificado Thu Oct 31 14:18:40 1996 by Eric S. Raymond <esr@y\thyrsus.com>
+.\" Modified 2001-12-17, aeb
+.\"
+.\" Translation revised Mon Aug 17 1998 by Juan Piernas <piernas@ditec.um.es>
+.\" Revisado por Miguel Pérez Ibars <mpi79470@alu.um.es> el 18-noviembre-2004
+.\"
+.TH GETSID 2 "17 diciembre 2001" "Linux 2.5.0" "Manual del Programador de Linux"
+.SH NOMBRE
+getsid \- obtener identificador de sesión
+.SH SINOPSIS
+.B #include <unistd.h>
+.sp
+.BI "pid_t getsid(pid_t" " pid" );
+.SH DESCRIPCIÓN
+.B getsid(0)
+devuelve el identificador de sesión del proceso invocador.
+.B getsid(p)
+devuelve el identificador de sesión del proceso con
+identificador
+.IR p .
+(El identificador de sesión de un proceso es el identificador de
+grupo de procesos del lider de sesión.)
+En caso de error, se devolverá (pid_t) \-1, y se modificará
+.I errno
+con un valor apropiado.
+.SH ERRORES
+.TP
+.B EPERM
+Existe un proceso con el identificador de proceso
+.I p
+, pero no se encuentra en la misma sesión que el proceso actual,
+y la implementación considera ésto un error.
+.TP
+.B ESRCH
+No se encontró un proceso con identificador
+.I p.
+.SH "CONFORME A"
+SVr4, POSIX 1003.1-2001.
+.SH OBSERVACIONES
+Linux no devuelve el valor EPERM.
+.LP
+Linux posee esta llamada al sistema desde la versión 1.3.44.
+Existe soporte de libc desde la versión 5.2.19 de libc.
+.LP
+Para obtener el prototipo bajo glibc, defina tanto _XOPEN_SOURCE como
+_XOPEN_SOURCE_EXTENDED, o use "#define _XOPEN_SOURCE \fIn\fP"
+para algún entero \fIn\fP mayor o igual a 500.
+.SH "VÉASE TAMBIÉN"
+.BR getpgid (2),
+.BR setsid (2)

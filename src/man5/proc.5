@@ -1,0 +1,1394 @@
+.\" Copyright (C) 1994, 1995 by Daniel Quinlan (quinlan@yggdrasil.com)
+.\" with networking additions from Alan Cox (A.Cox@swansea.ac.uk)
+.\" and scsi additions from Michael Neuffer (neuffer@mail.uni-mainz.de)
+.\" and sysctl additions from Andries Brouwer (aeb@cwi.nl)
+.\" and System V IPC (as well as various other) additions from
+.\" Michael Kerrisk (mtk16@ext.canterbury.ac.nz)
+.\"
+.\" This is free documentation; you can redistribute it and/or
+.\" modify it under the terms of the GNU General Public License as
+.\" published by the Free Software Foundation; either version 2 of
+.\" the License, or (at your option) any later version.
+.\"
+.\" The GNU General Public License's references to "object code"
+.\" and "executables" are to be interpreted as the output of any
+.\" document formatting or typesetting system, including
+.\" intermediate and printed output.
+.\"
+.\" This manual is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public
+.\" License along with this manual; if not, write to the Free
+.\" Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111,
+.\" USA.
+.\"
+.\" Wed May 17 15:26:04 1995: faith@cs.unc.edu, updated BUGS section
+.\" Minor changes by aeb and Marty Leisner (leisner@sdsp.mc.xerox.com).
+.\" Sat Apr 13 02:32:45 1996: aeb@cwi.nl, added sys, various fixes.
+.\" Mon Jul 22 17:14:44 1996: aeb@cwi.nl, minor fix.
+.\" Sun Dec 16 11:39:19 2001: rwhron@earthlink.net, update for 2.4.
+.\" Sat Jul 13 14:00:00 2002: jbelton@shaw.ca, added to sys/fs and sys/kernel.
+.\" Modified, 22 Jul 2002, Michael Kerrisk <mtk16@ext.canterbury.ac.nz>
+.\" Translated Mon Jan 26 18:15:00 1998 by Juan Piernas <piernas at dif.um.es>
+.\" Translation revised Mon Aug 17 1998 by Juan Piernas <piernas at ditec.um.es>
+.\" Translation revised Wed Dec 30 1998 by Juan Piernas <piernas at ditec.um.es>
+.\" Translation revised Tue Apr  6 1999 by Juan Piernas <piernas at ditec.um.es>
+.\" Translation revised Tue May 10 2005 by Juan Piernas <piernas at ditec.um.es>
+.\"
+.TH PROC 5 "13 julio 2002" "" "Manual del Programador de Linux"
+.SH NOMBRE
+proc \- pseudo-sistema de ficheros de información de procesos
+
+.SH DESCRIPCIÓN
+/proc es un pseudo-sistema de ficheros que se usa como interfaz para las
+estructuras de datos del núcleo en lugar de leer e interpretar /dev/kmem. La
+mayor parte de este sistema de ficheros es de sólo lectura, pero algunos 
+ficheros permiten cambiar variables del núcleo.
+.LP
+El siguiente resumen proporciona una rápida visita a la jerarquía /proc.
+.LP
+.\" .na
+.\" .nh
+.PD 1
+.TP
+.I [número]
+Hay un subdirectorio numérico para cada proceso en ejecución; el
+nombre del subdirectorio es el ID del proceso. Cada uno de ellos contiene
+los siguientes pseudo ficheros y directorios. 
+.RS
+.TP
+.I cmdline
+Éste contiene la línea de órdenes completa para el proceso, a menos que el
+proceso entero se haya intercambiado a disco o a menos que el proceso sea un
+proceso zombie. En cualquiera de estos dos últimos casos, no hay nada en el
+fichero, es decir, una lectura sobre este fichero devolverá 0
+caracteres. Los argumentos de la línea de órdenes aparecen en este
+fichero como un conjunto de cadenas separadas por nulos, con un byte
+nulo adicional tras la última cadena.
+.TP
+.I cwd
+Éste es un enlace hacia el directorio de trabajo actual del proceso. Por
+ejemplo, para encontrar el directorio de trabajo actual del proceso 20,
+puede hacer esto:
+
+.br
+.nf
+.ft CW
+cd /proc/20/cwd; /bin/pwd
+.fi
+.ft
+
+Dese cuenta que la orden pwd es frecuentemente una orden interna del shell,
+y podría no funcionar adecuadamente. En bash, debe usar pwd -P.
+.TP
+.I environ
+Este fichero contiene el entorno del proceso. Las entradas están serparadas
+por caracteres nulos, y podría haber un carácter nulo al final. Por tanto,
+para mostrar el entorno del proceso 1, debería hacer:
+
+.br
+.nf
+.ft CW
+(cat /proc/1/environ; echo) | tr "\\000" "\\n"
+.fi
+.ft P
+
+(Una razón por la que alguien querría hacer esto, la puede encontrar en
+.BR lilo (8).)
+.TP
+.I exe
+En la versiones 2.2 y 2.4 de Linux
+.I exe
+es un enlace simbólico que contiene el nombre de la ruta actual de la
+orden ejecutada.
+El enlace simbólico
+.I exe
+se puede resolver de forma normal - el intentar abrir
+.I exe
+abrirá el ejecutable. Incluso puede teclear
+.I /proc/[number]/exe
+para ejecutar otra copia del mismo proceso [número].
+
+En Linux 2.0 y versiones anteriores
+.I exe
+es un puntero al fichero binario que fue ejecutado y aparece como un enlace
+simbólico. Una llamada
+.I readlink(2)
+aplicada al fichero especial "exe" devuelve una cadena con el formato:
+
+[dispositivo]:nodo-i
+
+Por ejemplo, [0301]:1502 sería el nodo-i 1502 sobre el dispositivo con
+número mayor 03 (discos IDE, MFM, etc.) y número menor 01 (primera
+partición del primer disco.
+
+.BR find (1)
+con la opción -inum se puede usar para buscar el fichero.
+.TP
+.I fd
+Éste es un subdirectorio que contiene una entrada por cada fichero que tiene
+abierto el proceso, nombrada con el descriptor del fichero, y la cual es un
+enlace simbólico al fichero real (como lo es la entrada exe). Por tanto, 0
+es la entrada estándar, 1 es la salida estándar, 2 es la salida estándar de
+error, etc.
+
+Los programas que no leen de la entrada estándar, sino que leen de un
+fichero, y que no escriben en la salida estándar, sino que escriben en un
+fichero, pueden ser engañados de la siguiente manera, suponiendo que -i es
+la opción que designa al fichero de entrada y -o la opción que designa al
+fichero de salida:
+.br
+.nf
+.fi
+.ft P
+\f(CWfoobar -i /proc/self/fd/0 -o /proc/self/fd/1 \fR
+.fi
+.br
+y de esta manera su programa funcionará como filtro.  Note que esto no
+funcionará en programas que
+realizan accesos aleatorios sobre sus ficheros, ya que los ficheros del
+directorio fd no permiten este tipo de acceso.
+
+/proc/self/fd/N es aproximadamente lo mismo que /dev/fd/N en algunos
+sistemas UNIX y sistemas al estilo UNIX. De hecho, la mayoría de los guiones
+shell MAKEDEV de Linux enlazan simbólicamente /proc/self/fd con /dev/fd.
+.TP
+.I maps
+Fichero que contiene las regiones de memoria actualmente asociadas y sus
+permisos de acceso.
+
+El formato es:
+
+.nf
+.ft CW
+.in 8n
+Dirección         perms desplaz disp  nodo-i    ruta
+08048000-08056000 r-xp 00000000 03:0c 64593      /usr/sbin/gpm
+08056000-08058000 rw-p 0000d000 03:0c 64593      /usr/sbin/gpm
+08058000-0805b000 rwxp 00000000 00:00 0
+40000000-40013000 r-xp 00000000 03:0c 4165       /lib/ld-2.2.4.so
+40013000-40015000 rw-p 00012000 03:0c 4165       /lib/ld-2.2.4.so
+4001f000-40135000 r-xp 00000000 03:0c 45494      /lib/libc-2.2.4.so
+40135000-4013e000 rw-p 00115000 03:0c 45494      /lib/libc-2.2.4.so
+4013e000-40142000 rw-p 00000000 00:00 0
+bffff000-c0000000 rwxp 00000000 00:00 0
+
+.ft
+.fi
+.in
+
+donde dirección es el espacio de direcciones del proceso que ocupa, perms es
+un conjunto de permisos:
+
+.nf
+.in +5
+r = leer
+w = escribir
+x = ejecutar
+s = compartido
+p = privado (copia en escritura)
+.fi
+.in
+
+desplaz es el desplazamiento dentro del fichero/cosa, disp es el dispositivo
+(mayor:menor) y nodo-i es el nodo-i en ese dispositivo. 0 indica que no hay
+un nodo-i asociado a la región de memoria, como ocurriría con la región bss
+del proceso.
+
+En Linux 2.0 no existe un campo que dé el nombre de la ruta.
+.TP
+.I mem
+A través del fichreo
+.I mem
+se puede acceder a las páginas de la memoria de un proceso mediante
+.BR open (2),
+.BR read (2)
+y
+.BR fseek (3).
+.TP
+.I root
+Unix y Linux soportan la idea de una raíz del sistema de ficheros por proceso,
+asignada por la llamada al sistema
+.BR chroot (2).
+Root apunta a la raíz del sistema de ficheros y se comporta como lo hacen
+exe, fd/*, etc.
+.TP
+.I stat
+Información de estado del proceso. Ésta es usada por
+.BR ps (1).
+Se define en
+.IR /usr/src/linux/fs/proc/array.c "."
+
+Los campos, en orden, junto con sus indicadores de formato apropiados para
+.BR scanf (3),
+son:
+.RS
+.TP
+\fIpid\fP %d
+Identificador del proceso.
+.TP
+\fIcomm\fP %s
+Nombre de fichero del ejecutable, en paréntesis. Éste es visible dependiendo
+de si el ejecutable ha sido o no intercambiado.
+.TP
+\fIstate\fP %c
+Un carácter de la cadena "RSDZTW" donde R significa en ejecución, S bloqueado
+de forma interrumpible, D bloqueado de forma ininterrupible en una
+espera de disco, Z zombie, T proceso en ejecución paso a paso o parado
+(en una señal) y W transfiriendo páginas.
+.TP
+\fIppid\fP %d
+El PID del padre.
+.TP
+\fIpgrp\fP %d
+El identificador del grupo de procesos del proceso.
+.TP
+\fIsession\fP %d
+El identificador de sesión del proceso.
+.TP
+.\" tty_nr needs better explanation.
+\fItty_nr\fP %d
+El terminal que usa el proceso.
+.TP
+\fItpgid\fP %d
+El identificador del grupo de procesos del proceso al que pertenece
+actualmente la terminal a la que está conectado el proceso.
+.TP
+\fIflags\fP %u
+Las banderas del proceso.
+El bit "math" es el 4 (en decimal) y el bit "paso a paso" el 10 (en
+decimal).
+.TP
+\fIminflt\fP %lu
+El número de fallos de página menores producidos por el proceso
+que no han necesitado la carga de una página de memoria desde
+disco.
+.TP
+\fIcminflt\fP %lu
+El número de fallos de página menores producidos por el proceso y sus hijos.
+.TP
+\fImajflt\fP %lu
+El número de fallos de página mayores producidos por el proceso
+que han necesitado la carga de una página de memoria desde disco.
+.TP
+\fIcmajflt\fP %lu
+El número de fallos de página mayores producidos por el proceso y sus hijos.
+.TP
+\fIutime\fP %ld
+El número de \fIjiffies\fP que este proceso se ha planificado en modo usario.
+.TP
+\fIstime\fP %ld
+El número de \fIjiffies\fP que este proceso se ha planificado en modo núcleo.
+.TP
+\fIcutime\fP %ld
+El número de \fIjiffies\fP que este proceso y sus hijos se han planificado en modo
+usuario.
+.TP
+\fIcstime\fP %ld
+El número de \fIjiffies\fP que este proceso y sus hijos se han planificado en modo
+núcleo.
+.TP
+\fIpriority\fP %ld
+El valor ``nice'' estándar, más 15. El valor nunca es negativo dentro del
+núcleo.
+.TP
+\fInice\fP %ld
+El valor ``nice'', que va desde 19 (el más generoso) hasta -19 (el más
+codicioso).
+.TP
+.\" .TP
+.\" \fIcounter\fP %d
+.\" El tamaño máximo actual, en jiffies, del siguiente quantum del proceso, o lo
+.\" que queda actualmente de su quantum actual, si él es ahora mismo el proceso en
+.\" ejecución .
+.\" .TP
+.\" \fItimeout\fP %u
+.\" El tiempo, en jiffies, del siguiente "timeout" del proceso.
+\fI0\fP %ld
+Este valor se fija a 0 en el propio código y representa el lugar que
+ocupaba de un campo eliminado.
+.TP
+\fIitrealvalue\fP %u
+El tiempo en \fIjiffies\fP antes de que la siguiente señal SIGALRM sea enviada
+al proceso.
+.TP
+\fIstarttime\fP %lu
+Tiempo en \fIjiffies\fP desde el arranque del sistema hasta el inicio de la
+ejecución del proceso.
+.TP
+\fIvsize\fP %lu
+Tamaño de la memoria virtual en bytes.
+.TP
+\fIrss\fP %ld
+Tamaño del conjunto residente (RSS): número de páginas que el proceso tiene en
+memoria real, menos 3 (para propósitos administrativos). Dicho conjunto está
+formado por las páginas que componen actualmente el espacio de código, datos
+y pila. No incluye aquellas páginas que no se han cargado bajo demanda o que
+se han intercambiado a disco.
+.TP
+\fIrlim\fP %lu
+Límite actual, en bytes, del RSS del proceso (normalmente, 4294967295
+en i386).
+.TP
+\fIstartcode\fP %lu
+Dirección por encima de la cual se puede ejecutar el código del programa.
+.TP
+\fIendcode\fP %lu
+Dirección por debajo de la cual se puede ejecutar el código del programa.
+.TP
+\fIstartstack\fP %lu
+Dirección de comienzo de la pila.
+.TP
+\fIkstkesp\fP %lu
+El valor actual del registro ESP (puntero de pila), tal como se
+encuentra en la página de pila del proceso.
+.TP
+\fIkstkeip\fP %lu
+Valor actual del EIP (puntero de instrucción).
+.TP
+\fIsignal\fP %lu
+Mapa de bits de señales pendientes (normalmente 0).
+.TP
+\fIblocked\fP %lu
+Mapa de bits de señales bloqueadas (normalmente 0, 2 para los shells).
+.TP
+\fIsigignore\fP %lu
+Mapa de bits de señales ignoradas.
+.TP
+\fIsigcatch\fP %lu
+Mapa de bits de señales capturadas.
+.TP
+\fIwchan\fP %lu
+Este es el ``canal'' en el que está esperando el proceso. Es la dirección
+de una llamada al sistema y se puede mirar en una lista de nombres si
+necesita un nombre textual. (Pruebe \fIps -l\fP para ver WCHAN en
+acción.)
+.TP
+\fInswap\fP %lu
+Número de páginas intercambiadas - no guardadas.
+.TP
+\fIcnswap\fP %lu
+\fInswap\fP acumulativo para los procesos hijos.
+.TP
+\fIexit_signal\fP %d
+Señal a enviar al padre cuando muramos.
+.TP
+\fIprocessor\fP %d
+Número de CPU en la que se ejecutó por última vez.
+.RE
+.TP
+.I statm
+Proporciona información, en páginas, sobre la situación de memoria.
+Las columnas son:
+ size       tamaño total del programa
+ resident   tamaño del conjunto residente
+ share      páginas compartidas
+ trs        texto (código)
+ drs        datos/pila
+ lrs        biblioteca
+ dt         páginas modificadas
+.TP
+.I status
+Proporciona gran parte de la información de
+.I stat
+y
+.I statm
+en un formato que es mucho más fácil de leer para una persona.
+.RE
+.TP
+.I apm
+Proporciona información sobre la batería y la versión de APM cuando se
+ha definido CONFIG_APM en el instante de compilación del núcleo.
+.TP
+.I bus
+Contiene subdirectorios para los buses instalados.
+.RS
+.TP
+.I pccard
+Subdirectorio para dispositivos PCMCIA cuando se ha definido
+CONFIG_PCMCIA en el instante de compilación del núcleo.
+.RS
+.TP
+.I drivers
+.RE
+.RE
+.RS
+.TP
+.I pci
+Contiene varios subdirectorios de buses y pseudoficheros que
+contienen información sobre buses pci, dispositivos instalados y
+manejadores (\fIdrivers\fP) de dispositivo. Algunos de estos ficheros
+no son ASCII.
+.RS
+.TP
+.I devices
+Información sobre dispositivos pci. Se puede acceder a los mismos a
+través de
+.BR lspci (8)
+y
+.BR setpci (8).
+.RE
+.RE
+.TP
+.I cmdline
+Argumentos pasados al núcleo de Linux al arrancar. Normalmente se hace
+a través de un gestor de arranque como
+.BR lilo (1).
+.TP
+.I cpuinfo
+Este es una colección de elementos dependientes de la CPU y de la
+arquitectura del sistema. Para cada arquitectura soportada, una lista
+diferente. Dos entradas comunes son \fIprocessor\fP que da el número
+de CPU y \fIbogomips\fP, una constante del sistema que se calcula
+durante el arranque del núcleo. Las máquinas SMP tienen información
+para cada CPU.
+.TP
+.I devices
+Lista de números mayores de dispositivo y grupos de dispositivos. Esta puede
+ser usada por los guiones MAKEDEV para consistencia con el núcleo.
+.TP
+.I dma
+Esta es una lista de los canales DMA (acceso directo a memoria) \fIISA\fP
+registrados en uso. 
+.TP
+.I driver
+Subdirectorio vacío.
+.TP
+.I execdomains
+Lista de dominios de ejecución (personalidades ABI).
+.TP
+.I fb
+Información sobre el \fIframe buffer\fP cuando se define CONFIG_FB
+furante la compilación del núcleo.
+.TP
+.I filesystems
+Lista de los sistemas de ficheros que fueron compilados dentro del núcleo.
+Incidentalmente, 
+.BR mount (1)
+usa esto para circular a través de diferentes sistemas de ficheros
+cuando no se especifica ninguno.
+.TP
+.I fs
+Subdirectorio vacío.
+.TP
+.I ide
+.I ide
+existe en sistemas con bus ide. Hay directorios para cada canal ide y
+dispositivo conectado. Los ficheros incluyen:
+
+.nf
+cache              tamaño del buffer en KB
+capacity           número de sectores
+driver             versión del manejador
+geometry           geometría física y lógica
+identify           en hexadecimal
+media              tipo de medio
+model              número de modelo del fabricante
+settings           configuración de la unidad
+smart_thresholds   en hexadecimal
+smart_values       en hexadecimal
+.fi
+
+La utilidad
+.BR hdparm (8)
+proporciona acceso a esta información en un formato amigable.
+.TP
+.I interrupts
+Éste es usado para registrar el número de interrupciones para cada IRQ sobre
+(al menos) la arquitectura i386. El formato es muy fácil de leer, realizado
+en ASCII.
+.TP
+.I iomem
+Mapa de memoria de E/S en Linux 2.4.
+.TP
+.I ioports
+Ésta es una lista de las regiones de puertos de entrada/salida actualmente
+registrados que están en uso.
+.TP
+.I kcore
+Este fichero representa la memoria física del sistema y su formato es el de
+un fichero \fIcore ELF\fP. Con este pseudofichero y un binario del
+núcleo con información sobre símbolos (/usr/src/linux/vmlinuz), se
+puede usar GDB para examinar el estado actual de cualquier estrutura
+de datos del núcleo.
+
+La longitud total de este fichero es el tamaño de la memoria física (RAM)
+más 4KB.
+.TP
+.I kmsg
+Este fichero se puede usar en lugar de la llamada al sistema
+.BR syslog (2)
+para leer mensajes del núcleo. Un proceso debe tener permisos de
+superusuario para leer este fichero y sólo un proceso debe leer este
+fichero. Este fichero no se debe leer si se está ejecutando un proceso
+syslog que usa la llamada al sistema
+.BR syslog (2)
+para registrar mensajes del núcleo.
+
+A la información de este fichero se accede con el programa
+.BR dmesg (8).
+.TP
+.I ksyms
+Éste mantiene las difiniciones de símbolos exportados del núcleo usadas por
+las herramientas de manejo de
+.BR modulos (X)
+para enlazar dinámicamente módulos.
+.TP
+.I loadavg
+Los números de carga media dan el número promedio de trabajos en la cola de
+ejecución (estado R) o en espera de E/S de disco (estado D) en los
+últimos 1, 5 y 15 minutos. Estos números son idénticos a
+los números de carga media dados por
+.BR uptime(1)
+y otros programas.
+.TP
+.I locks
+Este fichero muestra los bloqueos de fichero
+.RB ( flock "(2) y " fcntl (2))
+y arrendamientos
+.RB ( fcntl (2))
+actuales.
+.TP
+.I malloc
+Este fichero sólo está presente si se definió CONFIGDEBUGMALLOC durante la
+compilación.
+.TP
+.I meminfo
+Éste es usado por
+.I free(1)
+para informar de la cantidad de memoria libre y usada en el sistema (tanto
+física como de intercambio) así como de la memoria compartida y los buffers
+usados por el núcleo.
+
+El formato es el mismo que el de
+.BR free (1),
+salvo que los datos se dan en bytes y no en KB.
+.TP
+.I modules
+Lista de módulos que han sido cargados por el sistema.
+Véase también
+.BR lsmod (8).
+.TP
+.I mtrr
+.IR "Memory Type Range Registers" .
+Vea
+.I /usr/src/linux/Documentation/mtrr.txt
+para más detalles.
+.TP
+.I net
+directorio que contiene varios pseudoficheros, los cuales dan el estado de
+algunas partes de la capa de red. Estos ficheros contienen estructuras ASCII
+y, por tanto, se pueden leer con cat. Sin embargo, la aplicación
+.BR netstat (8)
+proporciona un acceso mucho más claro a estos ficheros.
+.RS
+.TP
+.I arp
+Este mantiene un vaciado ASCII legible de la tabla ARP del núcleo usada para
+la resolución de direcciones. Mostrará tanto las entradas ARP aprendidas
+dinámicamente como las preprogramadas. El formato es:
+
+.nf
+.ft CW
+.in 8n
+IP address     HW type   Flags     HW address          Mask   Device
+192.168.0.50   0x1       0x2       00:50:BF:25:68:F3   *      eth0
+192.168.0.250  0x1       0xc       00:00:00:00:00:00   *      eth0
+.ft
+.fi
+.in
+.PP
+Aquí `IP address' es la dirección IPv4 de la máquina y `HW type' es el tipo
+de hardware de la dirección según el RFC 826. `Flags' son las banderas
+internas de la estructura ARP (tal y como se definen en
+/usr/include/linux/if_arp.h) y `HW address' es, si se conoce, la dirección de
+la capa física asociada a la dirección IP.
+.TP
+.I dev
+El pseudofichero dev contiene información de estado del dispositivo de red.
+Da el número de paquetes recividos y enviados, el número de errores y
+colisiones y otras estadísticas básicas. Estas son usadas por el programa
+.BR ifconfig (8)
+para informar del estado del dispositivo. El formato es:
+
+.nf
+.ft CW
+.in 1n
+Inter-|   Receive                                                |  Transmit
+ face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
+    lo: 2776770   11307    0    0    0     0          0         0  2776770   11307    0    0    0     0       0          0
+  eth0: 1215645    2751    0    0    0     0          0         0  1782404    4324    0    0    0   427       0          0
+  ppp0: 1622270    5552    1    0    0     0          0         0   354130    5669    0    0    0     0       0          0
+  tap0:    7714      81    0    0    0     0          0         0     7714      81    0    0    0     0       0          0
+.in
+.ft
+.fi
+.\" .TP
+.\" .I ipx
+.\" Information no disponible.
+·\" .TP
+.\" .I ipx_route
+.\" Information no disponible.
+.TP
+.I dev_mcast
+Se define en
+.IR /usr/src/linux/net/core/dev_mcast.c :
+.nf
+.in +5
+indx ifterface_name  dmi_u dmi_g dmi_address
+2    eth0            1     0     01005e000001
+3    eth1            1     0     01005e000001
+4    eth2            1     0     01005e000001
+.in
+.fi
+.TP
+.I igmp
+.IR "Internet Group Management Protocol" .
+Se define en
+.IR /usr/src/linux/net/core/igmp.c .
+.TP
+.I rarp
+Este fichero usa el mismo formato que el fichero
+.I arp
+y contiene la actual base de datos de asociaciones inversas usada para
+proporcionar los servicios de búsqueda de direcciones inversas de
+.Br rarp (8)
+Si RARP no está configurado dentro del núcleo, este fichero no estará
+presente.
+.TP
+.I raw
+Contiene un vaciado de la tabla de conectores RAW. La mayor parte de esta
+información no es útil salvo para propósitos de depuración. El valor `sl' es
+el número de entrada \fIhash\fP del núcleo para el conector. `local address' es la
+pareja formada por la dirección local y el número de puerto. `St' es el estado
+interno del conector. `tx_queue' y `rx_queue' son las colas de datos de
+entrada y salida en términos de uso de memoria del núcleo. Los
+campos `tr', `tm->when' y `rexmits' no los usa RAW. El campo `uid' contiene el
+idenficador de usario efectivo del creador del conector.
+.\" .TP
+.\" .I route
+.\" Information no disponible, pero funciona de forma parecida a
+.\" .BR route (8).
+.TP
+.I snmp
+Este fichero contiene los datos ASCII que necesitan las Bases de
+Información para Administración de IP, ICMP, TCP y UDP para un agente
+SNMP.
+.TP
+.I tcp
+Contiene un vaciado de la tabla de conectores TCP. La mayor parte de esta
+información no es útil salvo para propósitos de depuración. El valor `sl' es
+el número de la ranura \fIhash\fP del núcleo para el conector. `local address' es la
+pareja formada por la dirección local y el número de puerto. `remote address'
+es la pareja formada por la dirección remota y el número de puerto (si hay
+conexión). `St' es el estado interno del conector. `tx_queue' y `rx_queue' son
+las colas de datos de entrada y salida en términos de uso de memoria del
+núcleo. Los campos `tr', `tm->when' y `rexmits' contienen información del
+núcleo del estado del conector y sólo son útiles para depuración. El campo 
+`uid' contiene el idenficador de usario efectivo del creador del conector.
+.TP
+.I udp
+Contiene un vaciado de la tabla de conectores UDP. La mayor parte de esta
+información no es útil salvo para propósitos de depuración. El valor `sl' es
+el número de la entrada \fIhash\fP del núcleo para el conector. `local address' es la
+pareja formada por la dirección local y el número de puerto. `remote address'
+es la pareja formada por la dirección remota y el número de puerto (si hay
+conexión). `St' es el estado interno del conector. `tx_queue' y `rx_queue' son
+las colas de datos de entrada y salida en términos de uso de memoria del
+núcleo. Los campos `tr', `tm->when' y `rexmits' no son usados por UDP.
+El campo `uid' contiene el idenficador de usario efectivo del creador del
+conector. El formato es:
+
+.nf
+.ft CW
+.in 1n
+sl  local_address rem_address   st tx_queue rx_queue tr rexmits  tm->when uid
+ 1: 01642C89:0201 0C642C89:03FF 01 00000000:00000001 01:000071BA 00000000 0
+ 1: 00000000:0801 00000000:0000 0A 00000000:00000000 00:00000000 6F000100 0
+ 1: 00000000:0201 00000000:0000 0A 00000000:00000000 00:00000000 00000000 0
+.in
+.ft
+.fi
+.TP
+.I unix
+Lista de conectores de dominio UNIX presentes dentro del sistena y el estado de
+cada uno de ellos. El formato es:
+.nf
+.sp .5
+.ft CW
+Num RefCount Protocol Flags    Type St Path
+ 0: 00000002 00000000 00000000 0001 03
+ 1: 00000001 00000000 00010000 0001 01 /dev/printer
+.ft
+.sp .5
+.fi
+.PP
+Aquí `Num' es el número de entrada en la tabla del núcleo, `RefCount' es el
+número de usuarios del conector, `Protocol' es, actualmente, siempre 0,
+`Flags' representa las banderas internas del núcleo que contienen el estado
+del conector. Actualmente, `Type' es siempre 1 (los conectores de dominio UNIX
+del tipo datagrama todavía no están soportados en el núcleo). `St' es el
+estado interno del conector y `Path' es, si existe, la ruta asociada del
+conector.
+.RE
+.TP
+.I partitions
+Contains major and minor numbers of each partition as well as number
+of blocks and partition name.
+.TP
+.I pci
+Es una lista de todos los dispositivos PCI encontrados durante la
+inicialización del núcleo y sus configuraciones respectivas.
+.TP
+.I scsi
+Directorio con pseudoficheros SCSI de nivel medio y varios directorios de
+manejadores (\fIdrivers\fP) SCSI de bajo nivel, que contienen un fichero para cada host SCSI
+presente en el sistema, cada uno de los cuales da el estado de alguna parte
+del subsystema de E/S SCSI. Estos ficheros contienen estructuras ASCII y, por
+tanto, son legibles con cat.
+
+También se puede escribir en algunos de estos ficheros para reconfigurar el
+subsistema o para activar y desactivar ciertas características.
+.RS
+.TP
+.I scsi
+Esta es una lista de todos los dispositivos SCSI conocidos por el núcleo. La
+lista es similar a la que se ve durante el arranque.
+Actualmente, scsi únicamente soporta la orden \fIadd-single-device\fP que permite
+al superusuario añadir a la lista de dispositivos conocidos un dispositivo
+conectado "en caliente".
+
+.B echo `scsi add-single-device 1 0 5 0` > /proc/scsi/scsi 
+hará que el host scsi1 explore el canal SCSI 0 en busca de un dispositivo
+en la dirección ID 5 LUN 0. Si ya hay un dispositivo conocido en esa dirección
+o si la dirección es inválida, se devolverá un error.
+.TP
+.I drivername
+Actualmente, \fIdrivername\fP puede ser NCR53c7xx, aha152x, aha1542, aha1740,
+aic7xxx, buslogic, eata_dma, eata_pio, fdomain, in2000, pas16, qlogic,
+scsi_debug, seagate, t128, u15-24f, ultrastore o wd7000.
+Estos directorios presentan todos los manejadores que registraron al menos un
+HBA SCSI. Cada directorio contiene un fichero por host registrado. Cada
+fichero host tiene como nombre el número que el host obtuvo durante la
+inicialización.
+
+La lectura de estos ficheros mostrará normalmente la configuración del
+manejador y el host, estadísticas, etc.
+
+La escritura en estos ficheros permite diferentes cosas sobre diferentes
+hosts. Por ejemplo, con las órdenes \fIlatency\fP y \fInolatency\fP, el
+superusuario puede activar y desactivar en el manejador eata_dma el código para
+la medición de la latencia de las órdenes. Con las órdenes \fIlockup\fP y
+\fIunlock\fP, el superusuario puede controlar las búsquedas de bus simuladas
+por el manejador scsi_debug.
+.RE
+.TP
+.I self
+Este directorio hace referencia al proceso que está accediendo al sistema de
+ficheros /proc y es idéntico al directorio de /proc cuyo nombre es el PID
+del mismo proceso.
+.TP
+.I slabinfo
+Información sobre las memorias cachés del núcleo. Las columnas son:
+.nf
+cache-name
+num-active-objs
+total-objs
+object-size
+num-active-slabs
+total-slabs
+num-pages-per-slab
+.fi
+Vea
+.BR slabinfo (5)
+para más detalles.
+.TP
+.I stat
+Estadísticas del núcleo/sistema. Varían con la arquitectura. Entradas
+comunes son:
+.RS
+.TP
+\fIcpu  3357 0 4313 1362393\fP
+El número de jiffies (centésimas de segundo) que el sistema gastó en modo
+usuario, modo usuario con baja prioridad (nice), modo supervisor y en la
+tarea `idle', respectivamente. El último valor debe ser 100 veces la segunda
+entrada del pseudofichero uptime.
+.TP
+\fIpage 5741 1808\fP
+El número de páginas que el sistema cargó y el número de páginas que fueron
+descargadas (desde disco).
+.TP
+\fIswap 1 0\fP
+El número de páginas de intercambio que han sido introducidas y sacadas.
+.TP
+\fIintr 1462898\fP
+El número de interrupciones recibidas desde el arranque del sistema.
+.TP
+\fIdisk_io: (2,0):(31,30,5764,1,2) (3,0):\fP...
+(mayor,menor):(noinfo, ops_lectura, bloqs_leídos, ops_escritura, bloqs_escritos)
+.TP
+\fIctxt 115315\fP
+El número de cambios de contexto que el sistema ha sufrido.
+.TP
+\fIbtime 769041601\fP
+Instante de arranque, en segundos desde el 1 de Enero de 1970
+.TP
+\fIprocesses 86031\fP
+Número de llamadas al sistema `fork' desde el arranque.
+.RE
+.TP
+.I swaps
+Áreas de intercambio en uso. Véase también
+.BR swapon (8).
+.TP
+.I sys
+Este directorio (presente desde la versión 1.3.57) contiene varios ficheros
+y subdirectorios correspondientes a variables del núcleo. Estas variables se
+pueden leer y algunas veces modificar usando el sistema de ficheros \fIproc\fP
+y la llamada al sistema
+.BR sysctl (2).
+Actualmente, existen los subdirectorios 
+.IR abi ", " debug ", " dev ", " fs ", " kernel ", " net ", " proc ", "
+.IR rxrpc ", " sunrpc " y " vm
+
+que contienen a su vez más ficheros y subdirectorios.
+.RS
+.TP
+.I abi
+Este directorio puede contener ficheros con datos ABI (`application
+binary information`). No existe en algunos sistemas.
+.TP
+.I debug
+Este directorio puede estar vacío.
+.TP
+.I dev
+Este directorio contiene información específica de dispositivos (por
+ejemplo, dev/cdrom/info). En algunos sistemas puede estar vacío.
+.TP
+.I fs
+Éste contiene el subdirectorio
+.IR binfmt_misc
+y los ficheros
+.IR dentry-state ", " dir-notify-enable ", " dquot-nr ", " file-max ", "
+.IR file-nr ", " inode-max ", " inode-nr ", " inode-state ", "
+.IR lease-break-time ", " leases-enable ", " overflowgid ", " overflowuid
+.IR super-max " y " super-nr ", "
+cuya función se deduce cláramente a partir del nombre.
+.LP
+Se puede encontrar documentación para los ficheros de
+.I /proc/sys/binfmt_misc
+en el fichero
+.I Documentation/binfmt_misc.txt
+de los fuentes del núcleo.
+.LP
+El fichero
+.I dentry-state
+contiene seis números,
+.IR nr_dentry ", " nr_unused ", " age_limit " (edad en segundos), " want_pages
+(páginas solicitadas por el sistema) y dos valores ``tontos''.
+nr_dentry parece ser 0 todo el tiempo.
+nr_unused seems parece ser el número de \fIdentries\fP sin usar.
+age_limit es la edad en segundos tras la cual se puede reclamar una
+entrada \fIdentry\fP cuando hay poca memoria y want_pages no es cero
+después de que el núcleo haya llamado a shrink_dcache_pages() y no se
+haya reducido todavía el tamaño de la dcache.
+.LP
+El fichero
+.I dir-notify-enable
+se puede usar para activar o desactivar en todo el sistema la interfaz
+.I dnotify
+descrita en
+.BR fcntl (2).
+Un valor 0 en este fichero desactiva la interfaz y un valor 1 la
+activa.
+.LP
+El fichero
+.I dquot-max
+muestra el número máximo de entradas de cuota de disco en la caché
+correspondiente. Este fichero no existe en algunos sistemas (2.4). Si
+el número de entradas libres en la caché de cuotas de disco es muy
+pequeño y el número de usuarios simultáneos que tiene es muy grande,
+tal vez quiera subir este límite.
+.LP
+El fichero
+.I dquot-nr
+el número de entradas de cuota de disco asignadas y el número de
+entradas libres.
+.LP
+El fichero
+.I file-max
+es un límite global del sistema sobre el número de ficheros abiertos
+por todos los procesos.
+(Véase también
+.BR setrlimit (2),
+que un proceso puede usar para establecer el límite por proceso,
+.BR RLIMIT_NOFILE ,
+del número de ficheros que se pueden abrir.)
+Si obtiene un montón de mensajes de error que indican que se ha
+quedado sin manejadores de fichero, intente incrementar este valor:
+.br
+
+.br
+.nf
+.ft CW
+echo 100000 > /proc/sys/fs/file-max
+.fi
+.ft
+.LP
+La constante del núcleo
+.I NR_OPEN
+impone un límite superior sobre el valor que se puede colar en
+.IR file-max .
+.LP
+Sin incrementa
+.IR file-max ","
+asegúrese de incrementar
+.I inode-max
+a 3-4 veces el nuevo valor de
+.IR file-max ","
+o se quedará sin nodos-i.
+.LP
+El fichero (de sólo lectura)
+.I file-nr
+proporciona el número de ficheros abiertos en este momento. Contiene
+tres números: el número de manejadores de fichero asignados, el número
+de manejadores de fichero libres y el número máximo de manejadores de
+fichero. El núcleo reserva manejadores de fichero dinámicamente, pero
+no los libera otra vez. Si el número de ficheros asignados está
+cercano al máximo, debería considerar el incrementar dicho máximo.
+Cuando el número de manejadores de fichero libres es grande, ha
+encontrado un pico en su uso de manejadores de fichero y probablemente
+no necesite incrementar el máximo.
+.LP
+El fichero
+.I inode-max
+contiene el número máximo de nodos-i en memoria. Este fichero podría
+no existir en algunos sistemas (2.4). Este valor debería ser 3-4 veces
+más grande que el valor de file-max, ya que stdin, stdout y los
+conectores de red también necesitan un nodo-i para poder manejarlos.
+Si se queda sin nodos-i con frecuencia, necesitará incremetar este
+valor.
+.LP
+El fichero
+.I inode-nr
+contiene contiene los dos primeros valores de inode-state.
+.LP
+El fichero
+.I inode-state
+contiene siete números: nr_inodes, nr_free_inodes, preshrink y cuatro
+valores sin utilidad. nr_inodes es el número de nodos-i que el sistema
+ha asignado. Este número puede ser ligeramente mayor que inode-max ya
+que Linux reserva nodos-i usando páginas enteras. nr_free_inodes
+representa el número de nodos-i libres. preshrink es distinto de cero
+cuando nr_inodes > inode-max y el sistema necesita recortar la lista
+de nodos-i en lugar de reservar más.
+.LP
+El fichero
+.I lease-break-time
+especifica el periodo de gracia que el núcleo concede a un proceso que
+posee un arrendamiento de fichero
+.RB ( fcntl (2))
+después de que le haya enviado una señal a ese proceso notificándole
+que otro proceso está esperando para abrir el fichero. Si el
+arrendatario no elimina o reduce la categoría del arrendamiento dentro
+del periodo de gracia, el núcleo elimina el arrendamiento por la
+fuerza.
+.LP
+El fichero
+.I leases-enable
+se puede usar para activar o desactivar los arrendamientos de ficheros
+.RB ( fcntl (2))
+de forma global.
+Si este fichero contiene el valor 0, los arrendamientos están
+desactivados. Si el valor es distinto de 0, los arrendamientos están
+permitidos.
+.LP
+Los ficheros
+.IR overflowgid " y "
+.I overflowuid
+le permiten cambiar el valor del UID y GID fijos.
+El valor por omisión es 65534. Algunos sistemas de ficheros sólo
+permiten UIDs y GIDs de 16 bits, aunque en Linux los UIDs y GIDs son
+de 32 bits. Cuando uno de estos sistemas de ficheros está montado con
+escrituras permitidas, cualquier UID y GID que excediera 65535 se
+traduciría al valor de desbordamiento antes de ser escrito en disco.
+.LP
+El fichero
+.I super-max
+controla el número máximo de superbloques y, por tanto, el número
+máximo de sistemas de ficheros montados que puede tener el núcleo.
+Sólo necesita incrementar super-max si necesita montar más sistemas de
+ficheros que el valor actual de super-max le permite.
+El fichero
+.I super-nr
+contiene el número de sistemas de ficheros montados actualmente.
+.TP
+.I kernel
+Este directorio contiene los ficheros
+.IR acct ", " cad_pid ", " cap-bound  ", "  core_uses_pid  ", "
+.IR ctrl-alt-del ", " dentry-state ", " domainname ", " hostname ", "
+.IR htab-reclaim " (sólo en PowerPC), "
+.IR java-appletviewer " (binfmt_java, obsoleto), "
+.IR java-interpreter " (binfmt_java, obsoleto), " l2cr " (sólo en PowerPC), "
+.IR modprobe ", " msgmax ", " msgmnb ", "
+.IR msgmni ", " osrelease ", " ostype ", " overflowgid ", " overflowuid ", "
+.IR panic ", " powersave-nap " (sólo en PowerPC), " printk ", " random ", "
+.IR real-root-dev ", " reboot-cmd " (són en SPARC), " rtsig-max ", "
+.IR rtsig-nr ", " sem ", " sg-big-buff ", "
+.IR shmall ", " shmmax ", " shmmni ", " sysrq ", " tainted ", " threads-max ", "
+.IR version " y " zero-paged " (sólo en PowerPC) "
+cuya función está bastante clara a partir del nombre.
+.LP
+El fichero
+.I acct
+contiene tres números: highwater, lowwater y frequency.
+Si está activa la contabilidad de procesos al estido de BSD, estos
+valores controlan su comportamiento. Si el espacio libre en el sistema
+de ficheros donde se encuentra el registro cae por debajo del
+porcentaje `lowwater', la contabilidad se suspende. Si el espacio libre
+supera el porcentaje `highwater', la contabilidad se reanuda.
+`Frequency' determina la frecuencia con la que el núcleo comprueba la
+cantidad de espacio libre (el valor está en segundos). Los valores por
+omisión son 4, 2 y 30. Esto es, suspende la contabilidad si el espacio
+libre es igual o inferior al 2%; reanúdala si el espacio libre es
+igual o superior al 4%; considera válida la información sobre el
+espacio libre durante 30 segundos.
+.LP
+El fichero
+.I cap-bound
+contiene el valor del
+.I conjunto de capacidades limitantes
+del núcleo.
+(expresado como un entero decimal con signo). Durante un exec, se hace
+un Y\-lógico entre este conjunto y la capacidades permitidas al
+proceso.
+.LP
+El fichero
+.I core_uses_pid
+se puede usar en Linux 2.4 para controlar la forma de dar nombre a un
+fichero de vaciado de memoria (``core dump''). Si este fichero
+contiene el valor 0, el fichero simplemente se llama
+.IR core .
+Si el valor es distinto de cero, el fichero de vaciado de memoria
+incluye el ID del proceso en un nombre de la forma
+.IR core.PID .
+.LP
+El fichero
+.I ctrl-alt-del
+controla la gestión de la combinación Ctrl-Alt-Del del teclado. Cuando
+el valor de este fichero es 0, se captura Ctrl-Alt-Del y se envía al
+programa
+.BR init (1)
+para tratar un reinicio elegante. Cuando este valor es > 0, la
+reacción de Linux a un ``Vulcan Nerve Pinch'' (tm) (N.T.: frase con la que
+también se conoce al saludo de los tres dedos) será un reinicio
+inmediato, sin ni siquiera escribir en disco los buffers modificados.
+Nota: cuando un programa (como dosemu) tiene el teclado en modo
+`crudo', el programa interpreta ctrl-alt-del antes de que la
+combinación de teclas alcance la capa tty del núcleo y es asunto del
+programa decidir qué hacer con ella.
+.LP
+Los ficheros
+.IR domainname " y "
+.I hostname
+se pueden usar para establecer el nombre de dominio NIS/YP y el nombre
+de host de su ordenador exactamente de la misma forma que las órdenes
+domainname y hostname, es decir:
+.br
+
+.br
+# echo "darkstar" > /proc/sys/kernel/hostname
+.br
+# echo "mydomain" > /proc/sys/kernel/domainname
+.br
+
+.br
+tienen el mismo efecto que
+.br
+
+.br
+# hostname "darkstar"
+.br
+# domainname "mydomain"
+.br
+
+.br
+Observe, sin embargo, que el clásico darkstar.frop.org tiene el nombre
+de host ``darkstart'' y el nombre de dominio DNS (Internet Domain Name
+Server) ``frop.org'', que no se debe confundir con el nombre de
+dominio NIS (Network Information Service) o YP (Yellow Pages). En
+general, estos dos nombres de dominio son diferentes. Para una
+discusión más detallada, vea la página de manual
+.BR hostname (1).
+.LP
+Si al fichero
+.I htab-reclaim
+(sólo en PowerPC) se le asigna un valor distinto de cero, el PowerPC
+htab (vea el fichero del núcleo Documentation/powerpc/ppc_htab.txt) se
+reduce cada vez que el sistema alcanza el bucle ocioso.
+.LP
+El fichero
+.I l2cr
+(sólo en PowerPC) contiene una bandera que controla la caché L2 de las
+placas base de los procesadores G3. Si contiene 0, la caché se
+desactiva. Una valor distinto de cero la activa.
+.LP
+El fichero
+.I modprobe
+se describe en el fichero Documentation/kmod.txt de los fuentes del
+núcleo.
+.LP
+El fichero
+.I msgmax
+es un límite global del sistema que especifica el número máximo de
+bytes de un único mensaje escrito en una cola de mensajes System V.
+.LP
+El fichero
+.I msgmni
+define el límite global del sistema para el número de identificadores
+de colas de mensajes.
+(Este fichero sólo existe en Linux 2.4 y posteriores.)
+.LP
+El fichero
+.I msgmnb
+es un parámetro global del sistema que se usa para inicializar el
+valor
+.I msg_qbytes
+para las colas de mensajes creadas posteriormente.
+El valor de configuración
+.I msg_qbytes
+especifica el número máximo de bytes que se pueden escribir en una
+cola de mensajes.
+.LP
+Los ficheros
+.I ostype
+y
+.I osrelease
+dan subcadenas de
+.IR /proc/version .
+.LP
+Los ficheros
+.I overflowgid
+y
+.I overflowuid
+duplican los ficheros
+.I /proc/sys/fs/overflowgid
+y
+.IR /proc/sys/fs/overflowuid .
+.LP
+El fichero
+.I panic
+da los accesos de lectura/escritura sobre la variable del núcleo
+.IR panic_timeout .
+Si esto es 0, el núcleo entrará en un bucle infinito ante una situación de
+pánico; si no es cero, indica que el núcleo debe autoreinicializarse después
+de ese número de segundos. Cuando usa el manejador del dispositivo
+guardián software, el valor recomendado es 60.
+.LP
+El fichero
+.IR powersave-nap " (sólo en PowerPC)"
+contiene una bandera. Si está activa, Linux-PPC usará el modo `nap' de
+ahorro de energía, en caso contrario usará el modo `doze'.
+.LP
+Los cuatro valores del fichero
+.I printk
+son console_loglevel, default_message_loglevel, minimum_console_level
+y default_console_loglevel.
+Estos valores influyen en el comportamiento de printk() cuando se
+muestran o guardan en registro mensajes de error. Vea
+.BR syslog (2)
+para obtener más información sobre los diferentes `loglevels' (niveles
+de registro). Los mensajes con una prioridad mayor que
+console_loglevel se mostrarán en la consola. Los mensajes sin una
+prioridad explícita se mostrará con prioridad default_message_level.
+minimum_console_loglevel es el valor mínimo (el más alto) que se puede
+asignar a console_loglevel.
+default_console_loglevel es el valor por omisión para console_loglevel.
+.LP
+El directorio
+.\" FIXME say more about random
+.I random
+contiene varios parámetros que controlan el funcionamiento del fichero
+.IR /dev/random .
+.LP
+El fichero
+.I real-root-dev
+se documenta en el fichero Documentation/initrd.txt de los fuentes del
+núcleo.
+.LP
+El fichero
+.IR reboot-cmd " (sólo en Sparc) "
+parece ser una forma de proporcionar un argumento al cargador de
+arranque de la ROM/Flash de la SPARC. ¿Quizás para decirle qué hacer
+tras rearrancar?.
+.LP
+El fichero
+.I rtsig-max
+se puede usar para ajustar el número máximo de señales (encoladas)
+POSIX de tiempo real que pueden estar pendientes en el sistema.
+.LP
+El fichero
+.I rtsig-nr
+muestra el número de señales POSIX de tiempo real que hay encoladas
+actualmente.
+.LP
+El fichero
+.I sem
+(disponible desde la versión 2.4 de Linux)
+contiene 4 números que definen límites para los semáforos IPC de
+System V. Estos campos son, en orden:
+.IP SEMMSL 8
+Número máximo de semáforos por conjunto de semáforos.
+.IP SEMMNS 8
+Límite global del sistema para el número de semáforos en todos los
+conjuntos de semáforos.
+.IP SEMOPM 8
+Número máximo de operaciones que se pueden especificar en una llamada
+.BR semop (2).
+.IP SEMMNI 8
+Límite global del sistema para el número máximo de identificadores de
+semáforo.
+.LP
+El fichero
+.I sg-big-buff
+muestra el tamaño del buffer del dispositivo SCSI genérico (sg).
+Todavía no puede ajustarlo, pero puede cambiarlo al compilar editando
+include/scsi/sg.h y cambiando el valor de SG_BIG_BUFF. No obstante, no
+debería existir ninguna razón para cambiar este valor.
+.LP
+El fichero
+.I shmall
+contiene un límite global del sistema para el número total de páginas
+de memoria compartida System V.
+.LP
+El fichero
+.I shmmax
+se puede usar para consultar y establecer el límite en tiempo de
+ejecución del tamaño máximo de segmento (IPC de System V) de memoria
+compartida que se puede crear. Actualmente, se permiten en el núcleo
+segmentos de memoria compartida de hasta 1 Gb. El valor por omisión de
+este valor es SHMMAX.
+.LP
+El fichero
+.I shmmni
+(disponible desde la versión 2.4 de Linux) especifica el número máximo
+de segmentos de memoria compartida System V que se pueden crear en
+todo el sistema.
+.LP
+El fichero
+.I version
+contiene una cadena como:
+.br
+
+.br
+#5 Wed Feb 25 21:49:24 MET 1998.TP
+.br
+
+.br
+El `#5' significa que ésta es la quinta compilación del núcleo a
+partir de esta base de los fuentes y la fecha que hay detrás indica el
+instante en el que se construyó el núcleo.
+.LP
+El fichero
+.IR zero-paged " (sólo en PowerPC) "
+contiene una bandera. Cuando está activa (valor distinto de cero),
+Linux-PPC se decicará a rellenar páginas con ceros en el bucle ocioso,
+posiblemente acelerando la ejecución de get_free_pages.
+.TP
+.I net
+Este directorio contiene cosas de redes.
+.TP
+.I proc
+Este directorio puede estar vacío.
+.TP
+.I sunrpc
+Este directorio da soporte a las llamadas a procedimientos remotos de
+Sun para sistemas de ficheros de red (NFS). Este fichero podría no
+existir en algunos sistemas.
+.TP
+.I vm
+Este directorio contiene ficheros para el ajuste de la gestión de
+memoria y la gestión de buffers y cachés.
+.RE
+.TP
+.I sysvipc
+Subdirectorio que contiene los pseudoficheros
+.IR msg ", "  sem " y "  shm "."
+Estos ficheros listan los objetos IPC (Interprocess Communication) de
+System V (respectivamente: colas de mensajes, semáforos y memoria
+compartida) que actualmente existen en el sistema, proporcionando
+información similar a aquella disponible a través de
+.BR ipcs (1).
+Estos ficheros poseen encabezados y se formatean (mostrando un objeto
+IPC por línea) para una mejor interpretación.
+.BR ipc (5)
+proporciona datos adicionales sobre la información mostrada por estos
+ficheros.
+.TP
+.I tty
+Subdirectorio que contiene pseudoficheros y subdirectorios para
+los manejadores (\fIdrivers\fP) tty y las disciplinas de líneas.
+.TP
+.I uptime
+Este fichero contien dos números: los segundos que el sistema lleva
+funcionando y los segundos gastados en el proceso `idle'.
+.TP
+.I version
+Esta cadena identifica la versión del núcleo que se está ejecutando
+actualmente. Incluye el contenido de /proc/sys/ostype, /proc/sys/osrelease y
+/proc/sys/version. Por ejemplo:
+.nf
+.in -2
+.ft CW
+Linux version 1.0.9 (quinlan@phaze) #1 Sat May 14 01:51:54 EDT 1994
+.ft
+.in +2
+.fi
+
+.RE
+.RE
+.SH "VÉASE TAMBIÉN"
+.BR cat (1),
+.BR find (1),
+.BR free (1),
+.BR mount (1),
+.BR ps (1),
+.BR tr (1),
+.BR uptime (1),
+.BR chroot (2),
+.BR mmap (2),
+.BR readlink (2),
+.BR syslog (2),
+.BR slabinfo (5),
+.BR hier (7),
+.BR arp (8),
+.BR dmesg (8),
+.BR hdparm (8),
+.BR ifconfig (8),
+.BR lsmod (8),
+.BR lspci (8),
+.BR netstat (8),
+.BR procinfo (8),
+.BR route (8)
+.BR /usr/src/linux/Documentation/filesystems/proc.txt
+.SH CONFORME A
+Esto conforma aproximadamente con el núcleo 2.4.17 de Linux. Por favor,
+actualice esto cuando sea necesario.
+
+Ultima actualización para la versión 2.4.17 de Linux.
+.SH ATENCIÓN
+Observe que muchas cadenas (por ejemplo, el entorno y la línea de ordenes)
+están en formato interno, con los subcampos terminados por bytes NUL, por lo
+que puede encontrar que las cosas son más legibles si usa \fIod -c\fP o \fItr
+"\\000" "\\n"\fP para leerlas. Alternativamente, también funciona bien
+\fIecho `cat <file>`\fP.
+
+Esta página de manual está incompleta, posiblemente inexacta y es el tipo
+de cosas que necesitan ser actualizadas con mucha frecuencia.
+.SH RECONOCIMIENTOS
+El material sobre /proc/sys/fs y /proc/sys/kernel se basa en gran medida en
+los ficheros de documentación de los fuentes del núcleo escritos por
+Rik van Riel.
