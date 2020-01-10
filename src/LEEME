@@ -1,0 +1,74 @@
+* DESCRIPCIÓN
+
+Este archivo contiene la traducción al español del paquete man-pages
+en inglés. Es una versión beta, por lo que todavía puede encontrar
+bastantes errores. Cualquier contribución será bienvenida. Para
+cualquier duda o sugerencia sobre esta versión, envíe un correo a Juan
+Piernas Cánovas (piernas en ditec.um.es). Si desea colaborar en el
+proyecto, por favor, visite http://es.tldp.org.
+
+Puede encontrar un copia de las páginas de manual en español
+actualmente disponibles en http://www.ditec.um.es/~piernas/manpages-es
+
+* INSTALACIÓN
+
+Para instalar el paquete ejecute "make install", lo que simplemente
+copiará los ficheros a /usr/share/man/es/man[1-8], donde la aplicación
+man los encontrará si asigna es_ES o es_ES.UTF-8 a LANG.
+
+"make" moverá las páginas de este paquete que son más antiguas que las
+ya instaladas al subdirectorio `no_instaladas', a continuación
+eliminará las versiones antiguas (comprimidas o no) y finalmente
+copiará las nuevas páginas a /usr/share/man/es/man[1-8].
+
+Si su visualizador de páginas de manual puede manejar páginas
+comprimidas (man-1.5 puede), debería ejecutar "make gz" o "make bz2"
+antes de "make install", o simplemente ejecutar "make allgz" o "make
+allbz".
+
+Dese cuenta que puede que tenga eliminar algunas páginas
+preformateadas.
+
+Advierta también que algunas veces estas páginas están repetidas en
+otros paquetes. Es lo que ocurre con dlclose.3, dlerror.3, dlopen.3,
+dlsym.3 (que se encuentran en ld.so), con resolver.3, resolv.conf.5
+(que se encuentran en bind-utils) y con passwd.5 y mailaddr.7. Tenga
+cuidado de no sobrescribir versiones más actualizadas. Serán
+bienvenidos informes sobre otras páginas repetidas. Páginas repetidas
+formalmente presentes y ahora eliminadas son:
+
+         *_module.2, get_kernel_syms.2 (encontradas en modutils-2.1.*),
+         exports.5 (encontrada en nfs-server-2.2*), fstab.5, nfs.5
+         (encontradas en util-linux-2.11*), lilo.8, lilo.conf.5
+         (encontradas en lilo-21.6*).
+
+Dese cuenta de que las páginas de manual que vienen con las fileutils
+de GNU son en realidad textos de ayuda (de hecho, se generan
+automáticamente a partir de textos de ayuda) y son lo peor de lo peor.
+Sin ellas, la gente tendría buenas páginas de manual detalladas, como
+aquellas que se encuentran aquí en man1. Aún así, muchas
+distribuciones instalan estas "páginas de manual", en detrimento de
+sus usuarios.
+
+Envíe correcciones y mejoras de esta versión de las páginas de manual
+en español a Juan Piernas <piernas en ditec.um.es> (man.7 contiene
+alguna información sobre las macros a usar). Envíe correcciones y
+mejoras de las páginas de manual en inglés a aeb@cwi.nl.
+
+* CONFIGURACIÓN
+
+Tenga en cuenta que las páginas de manual en español están codificadas
+en UTF8. Si no puede verlas correctamente, tendrá que configurar
+adecuadamente las  aplicaciones correspondientes.
+
+* ATENCIÓN
+
+No se han traducido los siguientes ficheros:
+        - koi8-r.7
+
+* COPYRIGHT
+
+Estas páginas de manual vienen bajo diferentes licencias. Todas ellas
+se pueden distribuir libremente si se incluyen los fuentes en nroff.
+
+(C) 1997-2005. Los traductores del proyecto PAMELI

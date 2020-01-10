@@ -1,0 +1,257 @@
+.\" This is in the public domain
+.TH ld.so 8 "16 diciembre 2001"
+.SH NOMBRE
+ld.so, ld-linux.so* \- enlazador/cargador dinámico
+.SH DESCRIPCIÓN
+Los programas
+.B ld.so
+y
+.B ld-linux.so*
+encuentran y cargan las bibliotecas compartidas requeridas por un 
+programa, preparan al programa para ejecutarse y lo ejecutan.
+.LP
+Los ficheros binarios en Linux requieren enlace dinámico (enlace
+en tiempo de ejecución) a menos que se dé la opción
+.B \-static
+a
+.B ld
+durante la compilación.
+.LP
+El programa
+.B ld.so
+maneja ficheros binarios con el formato a.out, un formato
+usado hace tiempo;
+.B ld-linux.so*
+maneja el formato ELF (\fB/lib/ld-linux.so.1\fP para libc5, \fB/lib/ld-linux.so.2\fP
+para glibc2), que es el que se lleva usando desde hace unos años.
+Por lo demás, ambos tienen el mismo comportamiento y usan los mismos
+ficheros de configuración y programas
+.BR ldd (1),
+.BR ldconfig (8)
+y
+.IR /etc/ld.so.conf .
+.LP
+Las bibliotecas compartidas que necesita un programa se buscan
+en varios lugares:
+.IP o
+(sólo para ELF) Usando el atributo dinámico de sección DT_RPATH
+del binario si está presente y el atributo DT_RUNPATH no existe.
+No se aconseja el uso de DT_RPATH.
+.IP o
+Usando la variable de entorno
+.BR LD_LIBRARY_PATH ,
+salvo cuando el ejecutable tiene activo el bit setuid/setgid, en cuyo
+caso se ignora.
+.IP o
+(sólo para ELF) Usando el atributo dinámico de sección DT_RUNPATH 
+del binario si está presente.
+.IP o
+A partir del fichero caché
+.BR /etc/ld.so.cache ,
+que contiene una lista compilada de bibliotecas candidatas encontradas
+previamente en la ruta de bibliotecas ampliada. Si, sin embargo, el
+binario fue enlazado con la opción
+.BR "-z nodeflib" ,
+las bibliotecas que se encuentran en las rutas predeterminadas son omitidas.
+.IP o
+En la ruta predeterminada
+.BR /lib ,
+y después en
+.BR /usr/lib .
+Si el binario fue enlazado con la opción
+.BR -z nodeflib ,
+se omite este paso.
+.SH SINOPSIS
+El enlazador dinámico puede ejecutarse bien indirectamente, al ejecutar
+un programa o biblioteca enlazado dinámicamente (en cuyo caso no pueden pasarse
+opciones en la línea de órdenes al enlazador dinámico y, en el caso del formato ELF,
+se ejecuta el enlazador dinámico que se encuentra almacenado en la sección
+.B .interp
+del programa), bien directamente ejecutando:
+.P
+.B /lib/ld-linux.so.*
+[OPCIONES] [PROGRAMA [ARGUMENTOS]]
+.SH "OPCIONES DE LA LÍNEA DE ÓRDENES"
+.TP
+.B --list
+Lista todas las dependencias y cómo se resuelven.
+.TP
+.B --verify
+Comprueba que el programa está enlazado dinámicamente y que el enlazador dinámico
+puede tratarlo.
+.TP
+.B --library-path PATH
+Sobreescribe la variable de entorno
+.B LD_LIBRARY_PATH
+(vea más abajo).
+.TP
+.B --ignore-rpath LIST
+Ignora la información de RPATH y RUNPATH en los nombres de objeto en LIST.
+Esta opción fue soportada por glibc2 aproximadamente durante una hora.
+Después se renombró a:
+.TP
+.B --inhibit-rpath LIST
+.SH ENTORNO
+Hay cuatro variables de entorno relevantes.
+.TP
+.B LD_LIBRARY_PATH
+Una lista de directorios separados por dos puntos en los que se
+buscan las bibliotecas ELF en tiempo de ejecución.
+Similar a la variable de entorno
+.B PATH.
+.TP
+.B LD_PRELOAD
+Una lista adicional de biliotecas compartidas ELF especificadas por
+el usuario y separadas por blancos que se cargan antes que el resto.
+Puede ser utilizada para sobreescribir funciones en otras bibliotecas
+compartidas de manera selectiva.
+Para binarios ELF con el bit setuid/setgid activo, sólo se cargan las
+biliotecas en los directorios de búsqueda estándares que también tienen
+activo el bit setuid.
+.TP
+.B LD_BIND_NOW
+(libc5; glibc desde la versión 2.1.1)
+Si su valor no es la cadena vacía, el enlazador dinámico resuelve todos los
+símbolos al comienzo del programa, en lugar de aplazar la resolución
+de las llamadas a funciones hasta el punto donde son referenciadas 
+por primera vez.
+Es útil cuando se utiliza un depurador.
+.TP
+.B LD_TRACE_LOADED_OBJECTS
+(sólo para ELF)
+Si su valor no es la cadena vacía, el programa produce un listado de las
+bibliotecas dinámicas de las que depende, como si se hubiera ejecutado con
+.BR ldd (1),
+en lugar de ejecutar el programa normalmente.
+.LP
+También hay un montón de variables más o menos oscuras,
+muchas obsoletas o sólamente para uso interno.
+.TP
+.B LD_WARN
+(sólo para ELF)(glibc desde la versión 2.1.3)
+Si su valor no es la cadena vacía, avisa sobre los símbolos sin resolver.
+.TP
+.B LD_NOWARN
+(sólo para a.out)(libc5)
+Suprime los avisos sobre las bibliotecas a.out con números de versión
+menor incompatibles.
+.TP
+.B LD_BIND_NOT
+(glibc desde la versión 2.1.95)
+No actualiza el GOT (global offset table \- tabla de desplazamientos global) ni
+el PLT (procedure linkage table \- tabla de enlace de procedimientos)
+después de resolver un símbolo.
+.TP
+.B LD_DEBUG
+(glibc desde la versión 2.1)
+Produce abundante información de depuración acerca del enlazador
+dinámico. Si se le asigna el valor
+.B all
+imprime toda la información de depuración que posee, si se le
+asigna el valor
+.B help
+imprime un mensaje de ayuda con las categorías que pueden especificarse
+en esta variable de entorno.
+.TP
+.B LD_DEBUG_OUTPUT
+(glibc desde la versión 2.1)
+Fichero donde irá a parar la salida de
+.BR LD_DEBUG ,
+si no se especifica se asume la salida estándar.
+LD_DEBUG_OUTPUT se ignora para los binarios con el bit setuid/setgid activo.
+.TP
+.B LD_VERBOSE
+(glibc desde la versión 2.1)
+Si su valor no es la cadena vacía, muestra información sobre las
+versiones de los símbolos cuando se está solicitando información sobre
+el programa (es decir, o bien se ha activado
+.BR LD_TRACE_LOADED_OBJECTS ,
+o bien se ha dado al enlazador dinámico la opción
+.B --list
+o
+.BR --verify ).
+.TP
+.B LD_PROFILE
+(glibc desde la versión 2.1)
+Objeto compartido para el que se desea obtener el perfil.
+.TP
+.B LD_PROFILE_OUTPUT
+(glibc desde la versión 2.1)
+Fichero donde irá a parar la salida de
+.BR LD_PROFILE ,
+si no se especifica se asume la salida estándar.
+LD_DEBUG_OUTPUT se ignora para los binarios con el bit setuid/setgid activo.
+.TP
+.B LD_AOUT_LIBRARY_PATH
+(libc5)
+Versión de LD_LIBRARY_PATH sólo para los binarios a.out. Las versiones
+anteriores de ld-linux.so.1 también soportaban LD_ELF_LIBRARY_PATH.
+.TP
+.B LD_AOUT_PRELOAD
+(libc5)
+Versión de LD_PRELOAD sólo para los binarios a.out. Las versiones
+anteriores de ld-linux.so.1 también soportaban LD_ELF_PRELOAD.
+.TP
+.B LD_SHOW_AUXV
+(glibc desde la versión 2.1)
+Muestra el array auxiliar que se pasa desde el núcleo.
+.TP
+.B LD_HWCAP_MASK
+(glibc desde la versión 2.1)
+Máscara para las capacidades hardware.
+.TP
+.B LD_ORIGIN_PATH
+(glibc desde la versión 2.1)
+Ruta donde se encuentra el binario (para programas con el bit setuid desactivado).
+.TP
+.B LD_DYNAMIC_WEAK
+(glibc desde la versión 2.1.91)
+Permite que los símbolos débiles se puedan sobrescribir (volviendo al
+antiguo comportamiento de glibc).
+.TP
+.B LD_KEEPDIR
+(sólo para a.out)(libc5)
+No ignora el directorio en los nombres de las bibliotecas a.out que son cargadas.
+El uso de esta opción está fuertemente desaconsejado.
+.TP
+.B LDD_ARGV0
+(libc5)
+.IR argv [0]
+a ser usado por
+.BR ldd (1)
+cuando no hay ninguno.
+.SH FICHEROS
+.PD 0
+.TP
+.B /lib/ld.so
+enlazador/cargador dinámico
+.TP
+.BR /lib/ld-linux.so. { 1 , 2 }
+enlazador/cargador dinámico ELF
+.TP
+.B /etc/ld.so.cache
+Fichero que contiene una lista compilada de directorios en los que buscar
+biliotecas y una lista ordenada de bibliotecas candidatas.
+.TP
+.B /etc/ld.so.preload
+Fichero que contiene una lista de bibliotecas compartidas ELF separadas
+por blancos que son cargadas antes que el programa.
+.TP
+.B lib*.so*
+bibliotecas compartidas
+.PD
+.SH OBSERVACIONES
+La funcionalidad
+.B ld.so
+está disponible para ejecutables compilados usando la versión 4.4.3 de 
+libc o posterior.
+La funcionalidad ELF está disponible desde la versión 1.1.52 de Linux y libc5.
+.SH VÉASE TAMBIÉN
+.BR ldd (1),
+.BR ldconfig (8)
+.\" .SH AUTORS
+.\" ld.so: David Engel, Eric Youngdale, Peter MacDonald, Hongjiu Lu, Linus
+.\"  Torvalds, Lars Wirzenius and Mitch D'Souza
+.\" ld-linux.so: Roland McGrath, Ulrich Drepper and others.
+.\"
+.\" In the above, (libc5) stands for David Engel's ld.so/ld-linux.so.

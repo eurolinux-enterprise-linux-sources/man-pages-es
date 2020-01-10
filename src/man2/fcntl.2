@@ -1,0 +1,778 @@
+'\" t
+.\" Hey Emacs! This file is -*- nroff -*- source.
+.\"
+.\" This manpage is Copyright (C) 1992 Drew Eckhardt;
+.\"                               1993 Michael Haardt, Ian Jackson;
+.\"                               1998 Jamie Lokier;
+.\"                               2002 Michael Kerrisk.
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\"
+.\" Modified Sat Jul 24 13:39:26 1993 by Rik Faith (faith@cs.unc.edu)
+.\" Modified Tue Sep 26 21:47:21 1995 by Andries Brouwer <aeb@cwi.nl>
+.\" and again on 960413 and 989804 and 981223.
+.\" Modified Fri Dec 11 17:57:27 1998 by Jamie Lokier <jamie@imbolc.ucc.ie>
+.\" Applied correction by Christian Ehrhardt - aeb, 990712
+.\" Modified 23 Apr 02, Michael Kerrisk, <mtk16@ext.canterbury.ac.nz>
+.\"     Added note on F_SETFL and O_DIRECT
+.\"     Complete rewrite + expansion of material on file locking
+.\"     Incorporated description of F_NOTIFY, drawing on
+.\"             Stephen Rothwell's notes in Documentation/dnotify.txt.
+.\"     Added description of F_SETLEASE and F_GETLEASE
+.\" Corrected and polished, aeb, 020527.
+.\"
+.\"
+.\" Translated 22 Dec 1995 Miguel A. Sepulveda (miguel@typhoon.harvard.edu)
+.\" Modified 1 Jul 1996 Miguel A. Sepulveda (angel@vivaldi.princeton.edu)
+.\" Translation fixed and revised on Mon Apr 27 18:22:37 CEST 1998 by
+.\" Gerardo Aburruzaga García <gerardo.aburruzaga@uca.es>
+.\" Translation revised Tue Aug 18 1998 by Juan Piernas <piernas at ditec.um.es>
+.\" Translation revised Fri Oct 2 1998 by Juan Piernas <piernas at ditec.um.es>
+.\" Translation revised Tue Apr  6 1999 by Juan Piernas <piernas at ditec.um.es>
+.\" Translation revised Fri Jun 25 1999 by Juan Piernas <piernas at ditec.um.es>
+.\" Translation revised Sat Jan  8 2000 by Juan Piernas <piernas at ditec.um.es>
+.\" Revisado por Miguel Pérez Ibars <mpi79470 en alu.um.es> el 29-septiembre-2004
+.\" Translation revised Fri May  6 2005 by Juan Piernas <piernas at ditec.um.es>
+.\"
+.TH FCNTL 2 24-04-2002 Linux-2.5.18 "Manual del Programador de Linux"
+.SH NOMBRE
+fcntl \- manipula el descriptor de fichero
+.SH SINOPSIS
+.nf
+.B #include <unistd.h>
+.B #include <fcntl.h>
+.sp
+.BI "int fcntl(int " fd ", int " cmd );
+.BI "int fcntl(int " fd ", int " cmd ", long " arg );
+.BI "int fcntl(int " fd ", int " cmd ", struct flock *" lock );
+.fi
+.SH DESCRIPCIÓN
+.B fcntl
+realiza una de las diversas y variadas operaciones que se pueden hacer
+sobre
+.IR fd .
+La operación en cuestión se determina mediante
+.IR cmd .
+.SS "Tratamiento de la bandera «cerrar al ejecutar»"
+.TP
+.B F_DUPFD
+Busca el descriptor de fichero disponible de menor número, mayor o
+igual que
+.IR arg ,
+y lo convierte en una copia de
+.IR fd .
+Esto es diferente en
+.BR dup2 (2)
+que usa exactamente el descriptor especificado.
+.sp
+Los descriptores antiguo y nuevo pueden usarse indistintamente. Ambos
+comparten bloqueos (``locks''), indicadores de posición de ficheros y
+opciones o banderas (``flags''); por ejemplo, 
+si la posición del fichero se modifica usando
+.B lseek
+en uno de los descriptores, la posición del otro resulta modificada   
+simultáneamente.
+.sp
+Sin embargo, los dos descriptores no comparten la bandera
+.I close-on-exec
+(«cerrar al ejecutar»). La bandera
+.I close-on-exec
+de la copia está desactivada, lo que significa que no se cerrará al
+ejecutar.
+.sp
+En caso de éxito, se devuelve el nuevo descriptor.
+.TP
+.B F_GETFD
+Lee la bandera
+.IR close-on-exec.
+Si el bit
+.B FD_CLOEXEC
+es 0, el fichero permanecerá abierto tras
+.BR exec ,
+en caso contrario se cerrará el fichero.
+.TP
+.B F_SETFD
+Establece la bandera
+.I close-on-exec
+al valor especificado por el bit
+.B FD_CLOEXEC
+de
+.IR arg .
+.SS "Banderas de situación de un fichero"
+Un descriptor de fichero posee ciertas banderas asociadas,
+inicializadas por
+.BR open (2)
+.\" or
+.\" .BR creat (2),
+y posiblemente modificadas por
+.BR fcntl (2).
+Las banderas se comparten entre copias (hechas con
+.BR dup (2),
+.BR fork (2),
+etc.) del mismo descriptor de fichero.
+.sp
+Las banderas y su semántica están descritas en 
+.BR open (2).
+.TP
+.B F_GETFL
+Lee las banderas de un descriptor de fichero.
+.TP
+.B F_SETFL
+De las banderas de un descriptor, establece la parte que se
+corresponde con las banderas de situación de un fichero al valor
+especificado por
+.IR arg .
+Los restantes bits (modo de acceso, banderas de creación de un
+fichero) de
+.I arg
+se ignoran.
+En Linux, esta orden sólo puede cambiar las banderas O_APPEND,
+O_NONBLOCK, O_ASYNC y O_DIRECT.
+.P
+.SS "Bloqueos (candados) consultivos"
+.BR F_GETLK ", " F_SETLK " y " F_SETLKW
+se usan para adquirir, liberar y comprobar la existencia de bloqueos
+de registros (también conocidos como bloqueos de segmentos de ficheros
+o regiones de ficheros).
+El tercer argumento
+.I lock
+es un puntero a una estructura que tiene, al menos, los siguientes
+campos (en un orden indeterminado).
+.in +2n
+.nf
+.sp
+struct flock {
+    ...
+    short l_type;    /* Tipo de bloqueo: F_RDLCK,
+                        F_WRLCK, F_UNLCK */
+    short l_whence;  /* Cómo interpretar l_start:
+                        SEEK_SET, SEEK_CUR, SEEK_END */
+    off_t l_start;   /* Dirección de inicio del bloqueo */
+    off_t l_len;     /* Número de bytes a bloquear */
+    pid_t l_pid;     /* PID del proceso que bloquea nuestro candado
+                        (sólo F_GETLK) */
+    ...
+};
+.fi
+.in -2n
+.P
+Los campos
+.IR l_whence ", " l_start " y " l_len
+de esta estructura especifican el rango de bytes que deseamos
+bloquear.
+.I l_start
+es la dirección inicial para el bloqueo y se interpreta relativa a:
+el inicio del fichero (si
+.I l_whence
+es
+.BR SEEK_SET );
+la posición actual dentro del fichero (si
+.I l_whence
+es
+.BR SEEK_CUR )
+o el fin del fichero (si
+.I l_whence
+es
+.BR SEEK_END ).
+En los dos últimos casos,
+.I l_start
+puede ser un número negativo siempre que la dirección inicial final no
+quede antes del principio del fichero.
+.I l_len
+es un entero no negativo (aunque vea NOTAS más abajo) que indica el
+número de bytes a bloquear. Los bytes que se encuentren más allá del
+final del fichero se pueden bloquear, pero no los bytes que se
+encuentren antes del inicio del fichero. El especificar 0 para
+.I l_len
+tiene un significado especial: bloquear todos los bytes desde la
+posición indicada por
+.IR l_whence " y " l_start
+hasta el final del fichero, sin importar cuánto crezca el fichero.
+.P
+El campo
+.I l_type
+se puede usar para colocar un bloqueo de lectura
+.RB ( F_RDLCK )
+o de escritura
+.RB ( F_WDLCK )
+sobre un fichero.
+Varios procesos pueden tener un bloqueo de lectura (bloqueo
+compartido) sobre una región de fichero, pero sólo un proceso puede
+tener un bloqueo de escritura (bloqueo exclusivo). Un bloqueo
+exclusivo excluye a todos los demás bloqueos, tanto compartidos como
+exclusivos. Un único proceso sólo puede tener un tipo de bloqueo sobre
+una región de fichero; si se aplica un nuevo bloqueo a una región ya
+bloqueada, el bloqueo existente se convierte al nuevo tipo de bloqueo.
+(Tales conversiones pueden suponer dividir, reducir o fusionar un
+bloqueo existente si el rango de bytes especificado por el nuevo
+bloqueo no coincide exactamente con el rango del bloqueo existente).
+.TP
+.B F_SETLK
+Adquiere un bloqueo (cuando
+.I l_type
+es
+.B F_RDLCK
+o 
+.BR F_WRLCK )
+o libera un bloqueo (cunado
+.I l_type
+es
+.BR F_UNLCK )
+sobre los bytes especificados por los campos
+.IR l_whence ", " l_start " y " l_len
+de
+.IR lock .
+Si otro proceso mantiene ya un bloqueo que entra en conflicto con
+el nuevo, la llamada devuelve \-1 y asigna a
+.I errno 
+el código de error
+.B EACCES
+o
+.BR EAGAIN .
+.TP
+.B F_SETLKW
+Como
+.BR F_SETLK ,
+pero si ya hay un bloqueo sobre el fichero que entra en conflicto
+con el nuevo, entonces espera a que el bloqueo se libere. Si llega y
+se captura una señal mientras se está esperando, se interrumpe la
+llamada y (tras terminar el manejador de señal) regresa inmediatamente
+(devolviendo \-1 y asignado a
+.I errno
+el valor
+.BR EINTR ).
+.TP
+.B F_GETLK
+Al entrar a esta llamada,
+.I lock
+describe un bloqueo que nos gustaría colocar en un fichero. Si el
+bloqueo se pudiera colocar,
+.BR fcntl ()
+realmente no lo colocará, pero devolverá
+.B F_UNLCK
+en el campo
+.I l_type
+de
+.I lock
+y dejará los otros campos de la estructura sin cambiar. Si uno o más
+bloqueos incompatibles impidieran que este bloqueo se colocara,
+entonces
+.BR fcntl ()
+devolverá detalles sobre uno de estos bloqueos en los campos
+.IR l_type ", " l_whence ", " l_start " y " l_len
+de
+.I lock
+y asignará a
+.I l_pid
+el PID del proceso que posee el bloqueo.
+.P
+Para colocar un bloqueo de lectura, se debe abrir
+.I fd
+para lectura. Para colocar un bloqueo de escritura, se debe abrir
+.I fd
+para escritura. Para colocar ambos tipos de bloqueo, abra un fichero
+para lectura y escritura.
+.P
+Además de ser eliminados por un
+.B F_UNLCK
+explícito, los bloqueos de registros se liberan automáticamente cuando
+un proceso termina o cierra
+.I cualquier
+descriptor de fichero que haga referencia a un fichero sobre el que se
+mantienen los bloqueos.
+.\" (Additional file descriptors referring to the same file
+.\" may have been obtained by calls to
+.\" .BR open "(2), " dup "(2), " dup2 "(2), or " fcntl (2).)
+Esto está mal: significa que un proceso puede perder los bloqueos sobre
+un fichero como
+.I /etc/passwd
+o
+.I /etc/mtab
+cuando, por alguna razón, una función de biblioteca decida abrir, leer
+y cerrar el fichero.
+.P
+Los bloqueos de registros no los hereda un hijo creado mediante
+.BR fork (2),
+pero se conservan a través de
+.BR execve (2).
+.P
+Debido al almacenamiento temporal que realiza
+.BR stdio (3),
+se debería evitar el bloqueo de registros con rutinas de esa
+biblioteca; en su lugar, use
+.BR read "(2) y " write (2).
+.P
+.SS "Bloqueos obligatorios"
+(No POSIX.)
+Los bloqueos de registro anteriores pueden ser o bien consultivos o
+bien obligatorios, y son consultivos por omisión. Para usar bloqueos
+obligatorios, se debe habilitar dicho tipo de bloqueo
+en el sistema de ficheros que contiene el fichero a bloquear
+(usando la opción "-o mand" en
+.BR mount (8))
+y en el propio fichero (deshabilitando el permiso de ejecución para
+el grupo y activado el bit de permiso set-GID).
+
+Los bloqueos consultivos no son de obligado cumplimiento y sólo son
+útiles entre procesos que cooperan. Los bloqueos obligatorios son
+respetados por todos los procesos.
+.P
+.SS "Manejo de señales"
+.BR F_GETOWN ", " F_SETOWN ", " F_GETSIG " y " F_SETSIG
+se utilizan para gestionar las señales de disponibilidad de E/S:
+.TP
+.B F_GETOWN
+Obtiene el ID de proceso o el grupo de procesos que actualmente recibe las
+señales SIGIO y SIGURG para los eventos sobre el descriptor de fichero
+.IR fd .
+.sp
+Los grupos de procesos se devuelven como valores negativos.
+.TP
+.B F_SETOWN
+Establece el ID de proceso o el grupo de procesos que recibirá las señales
+SIGIO y SIGURG para los eventos sobre el descriptor de fichero
+.IR fd .
+.sp
+Los grupos de procesos se especifican mediante valores negativos.
+(Se puede usar
+.B F_SETSIG
+para especificar una señal diferente a SIGIO).
+
+.\" De glibc.info:
+Si activa la bandera de estado
+.B O_ASYNC
+sobre un descriptor de fichero (tanto si proporciona esta bandera con la
+llamada
+.IR open (2)
+como si usa la orden
+.B F_SETFL
+de
+.BR fcntl ),
+se enviará una señal SIGIO cuando sea posible la entrada o la salida sobre
+ese descriptor de fichero.
+.sp
+El proceso o el grupo de procesos que recibirá la
+señal se puede seleccionar usando la orden
+.B F_SETOWN
+de la función
+.BR fcntl .
+Si el descriptor de fichero es un conector (``socket''), esto también
+seleccionará al recipiente de las señales SIGURG que se entregan cuando
+llegan datos fuera de orden (``out-of-band'', OOB) sobre el enchufe. (SIGURG se
+envía en cualquier situación en la que
+.BR select (2)
+informaría que el conector tiene una "condición excepcional"). Si el
+descriptor de fichero corresponde a un dispositivo de terminal, entonces las
+señales SIGIO se envían al grupo de procesos en primer plano de la terminal.
+.TP
+.B F_GETSIG
+Obtiene la señal enviada cuando la entrada o la salida son posibles. Un
+valor cero significa que se envía SIGIO. Cualquier otro valor (incluyendo
+SIGIO) es la señal enviada en su lugar y en este caso se dispone de
+información adicional para el manejador de señal si éste se instala con
+SA_SIGINFO.
+.TP
+.B F_SETSIG
+Establece la señal enviada cuando la entrada o la salida son posibles. Un
+valor cero significa enviar la señal por defecto SIGIO. Cualquier otro valor
+(incluyendo SIGIO) es la señal a enviar en su lugar y en este caso se
+dispone de información adiciona para el manejador de señal si éste se
+instala con SA_SIGINFO.
+.sp
+Usando F_SETSIF con un valor distinto de cero y asignando SA_SIGINFO para el
+manejador de señal (vea
+.BR sigaction (2)),
+se pasa información extra sobre los eventos de E/S al manejador en la
+estructura
+.IR siginfo_t .
+Si el campo
+.I si_code
+indica que la fuente es SI_SIGIO, el campo
+.I si_fd
+proporciona el descriptor de fichero asociado con el evento. En caso
+contrario, no se indican qué descriptores de ficheros hay pendientes y, para
+determinar qué descriptores de fichero están disponibles para E/S, debería
+usar los mecanismos usuales
+.RB ( select (2),
+.BR poll (2),
+.BR read (2)
+con
+.B O_NONBLOCK
+activo, etc.).
+.sp
+Seleccionando una señal de tiempo real POSIX.1b (valor >= SIGRTMIN), se
+pueden encolar varios eventos de E/S usando los mismos números de señal. (El
+encolamiento depende de la memoria disponible). Se dispone de información
+extra si se asigna SA_SIGINFO al manejador de señal, como antes.
+.PP
+Usando estos mecanismos, un programa puede implementar E/S totalmente
+asíncrona, sin usar
+.BR select (2)
+ni
+.BR poll (2)
+la mayor parte del tiempo.
+.PP
+El uso de 
+.BR O_ASYNC ,
+.BR F_GETOWN
+y
+.B F_SETOWN
+es específico de Linux y BSD.
+.B F_GETSIG
+y
+.B F_SETSIG
+son específicos de Linux. POSIX posee E/S asíncrona y la estructura
+.I aio_sigevent
+para conseguir cosas similares; éstas también están disponibles en Linux
+como parte de la biblioteca de C de GNU (GNU C Library, Glibc).
+.P
+.SS Arrendamientos
+.B F_SETLEASE
+y
+.B F_GETLEASE
+(Linux 2.4 y posteriores) se usan (respectivamente) para establecer y
+obtener la configuración actual del arrendamiento del proceso
+invocador sobre el fichero referenciado por
+.IR fd .
+Un arrendamiento de fichero proporciona un mecanismo por medio del
+cual al proceso que posee el arrendamiento (el "arrendatario") se le
+notifica (mediante el envío de una señal) cuándo otro proceso (el
+"competidor") intenta abrir
+.RB ( open (2))
+o truncar
+.RB ( truncate (2))
+ese fichero.
+.TP
+.B F_SETLEASE
+Establece o elimina un arrendamiento de fichero según qué valor de los
+siguientes se especifique en el entero
+.IR arg :
+
+.RS
+.TP
+.B F_RDLCK
+Obtiene un arrendamiento de lectura. Esto hará que se nos informe
+cuando otro proceso abra el fichero para escribir en él o cuando lo
+trunque.
+.TP
+.B F_WRLCK
+Obtiene un arrendamiento de escritura. Esto hará que se nos informe
+cuando otro proceso abra el fichero (para leer o escribir) o lo
+trunque. Sólo se puede colocar un arrendamiento de escritura en un
+fichero cuando ningún otro proceso lo tenga abierto en ese momento.
+.TP
+.B F_UNLCK
+Elimina nuestro arrendamiento del fichero.
+.RE
+.P
+Un proceso sólo puede tener un tipo de arrendamiento sobre un fichero.
+.P
+Los arrendamientos sólo se pueden obtener para ficheros regulares. Un
+proceso normal sólo puede obtener un arrendamiento sobre un fichero
+cuyo UID coincida con el UID de sistema de ficheros del proceso.
+.TP
+.B F_GETLEASE
+Indica qué tipo de arrendamiento tenemos sobre el fichero referenciado
+por
+.I fd
+devolviendo
+.BR F_RDLCK ", " F_WRLCK " o " F_UNLCK ,
+lo que indica, respectivamente, que el proceso invocador posee un
+arrendamiento de lectura, de escritura o que no posee arrendamiento
+alguno sobre el fichero.
+(El tercer argumento de
+.BR fcntl ()
+se omite.)
+.PP
+Cuando el competidor realiza un
+.BR open ()
+o
+.BR truncate ()
+que entra en conflicto con un arrendamiento establecido mediante
+.BR F_SETLEASE ,
+el núcleo bloquea la llamada al sistema (a menos que se especifique la
+opción
+.B O_NONBLOCK
+en
+.BR open (),
+en cuyo caso la llamada regresa inmediatamente con el error
+.BR EWOULDBLOCK ).
+El núcleo entonces notifica al arrendatario enviándole una señal
+(SIGIO por omisión).
+El arrendatario debe responder a la recepción de esta señal
+haciendo cualquier limpieza que sea necesaria para preparar el fichero
+para que sea accedido por otro proceso (por ejemplo, vaciando los
+buffers en caché) y entonces eliminar su arrendamiento ejecuntado una
+orden
+.B F_SETLEASE
+que especifique en
+.I arg
+el valor
+.BR F_UNLCK .
+
+Si el arrendatario no libera el arrendamiento antes del número de
+segundos especificado en
+.I /proc/sys/fs/lease-break-time
+y la llamada al sistema del competidor sigue bloqueada
+(es decir, el competidor no especificó
+.B O_NONBLOCK
+en su llamada
+.BR open ()
+y la llamada al sistema no ha sido interrumpida por un manejador de
+señal), entonces el núcleo pone fin al arrendamiento del arrendatario
+por la fuerza.
+
+Una vez que se ha eliminado voluntariamente o por la fuerza el
+arrendamiento, y suponiendo que el competidor no ha desbloqueado su
+llamada al sistema, el núcleo permite continuar a la llamada al
+sistema del competidor.
+
+La señal por omisión que se usa para informar al arrendatario es
+SIGIO, pero se puede cambiar usando la orden
+.B F_SETSIG
+de
+.B fcntl ().
+Si se ejecuta una orden
+.B F_SETSIG
+(incluso una que especifique SIGIO) y el manejador de señal se
+establece usando SA_SIGINFO, el manejador recibirá una estructura
+.I siginfo_t
+como su segundo argumento y el campo
+.I si_fd
+de este argumento contendrá el descriptor del fichero arrendado que ha
+sido accedido por otro proceso. (Esto es útil si el invocador tiene
+arrendamientos para varios ficheros).
+.SS "Notificación de cambios en ficheros y directorios"
+.TP
+.B F_NOTIFY
+(Linux 2.4 y posteriores)
+Produce una notificación cuando cambia el directorio referenciado por
+.I fd
+o cualquiera de los ficheros que contiene. Los eventos a notificar se
+indican en
+.IR arg ,
+que es una máscara de bits que se especifica mediante un O\-lógico de
+cero o más de los siguientes bits:
+
+.TS
+l l
+----
+lB l.
+Bit	Descripción (evento en el directorio)
+DN_ACCESS	Se ha accedido a un fichero (read, pread, readv)
+DN_MODIFY	Se ha modificado un fichero (write, pwrite,
+	writev, truncate, ftruncate)
+DN_CREATE	Se ha creado un fichero (open, creat, mknod,
+	mkdir, link, symlink, rename)
+DN_DELETE	Se ha borrando un fichero (unlink, rename a
+	otro directorio, rmdir)
+DN_RENAME	Se ha cambiado el nombre de un fichero de este
+	directorio (rename)
+DN_ATTRIB	Se han cambiado los atributos de un fichero
+	(chown, chmod, utime[s])
+.TE
+.sp
+(Para obtener estas definiciones, se debe define la macro _GNU_SOURCE
+antes de incluir <fcntl.h>.)
+.sp
+Las notificaciones de directorio normalmente se reciben una única vez
+(son de tipo ``one-shot'') y la aplicación debe volver a hacer el
+registro para recibir notificaciones adicionales. Otra posibilidad es
+incluir
+.B DN_MULTISHOT
+en
+.IR arg ,
+en cuyo caso la notificación se producirá hasta que se elimine
+explícitamente.
+.\" The following does seem a poor API-design choice...
+Una serie de llamadas que especifican
+.B DN_MULTISHOT
+es acumulativa, con los eventos en
+.I arg
+añadiéndose al conjunto ya monitorizado.
+Para desactivar la notificación de todos los eventos, haga una llamada
+.B F_NOTIFY
+especificando 0 en
+.IR arg .
+.sp
+La notificación se produce mediante el envío de una señal. La señal
+por omisión es SIGIO, pero se puede cambiar usando la orden
+.B F_SETSIG
+de
+.BR fcntl ().
+En el segundo caso, el manejador de señal recibe una estructura
+.I siginfo_t
+como su segundo argumento (si el manejador se estableció usando
+SA_SIGINFO) y el campo
+.I si_fd
+de esta estructura contiene el descriptor de fichero que produjo la
+notificación (útil cuando se establecen notificaciones en varios
+directorios).
+.sp
+Especialmente cuando se usa
+.BR DN_MULTISHOT ,
+se debería usar una señal POSIX.1b de tiempo real para notificación,
+de tal manera que se pueden encolar multiples notificaciones.
+.SH "VALOR DEVUELTO"
+Para una llamada con éxito, el valor devuelto depende de la operación:
+.TP 0.9i
+.B F_DUPFD
+El nuevo descriptor.
+.TP
+.B F_GETFD
+Valor de la bandera.
+.TP
+.B F_GETFL
+Valor de las banderas.
+.TP
+.B F_GETOWN
+Valor del propietario del descriptor.
+.TP
+.B F_GETSIG
+Valor de la señal enviada cuando la lectura o la escritura son posibles o
+cero para el comportamiento tradicional con SIGIO.
+.TP
+.B Para cualquier otra orden
+Cero.
+.PP
+En caso de error el valor devuelto es \-1 y se asigna a
+.I errno
+un valor apropiado.
+.SH ERRORES
+.TP
+.BR EACCESS " o " EAGAIN
+Se ha prohibido la operación debido a bloqueos mantenidos por otros
+procesos.
+O se ha prohibido la operación porque el fichero ha sido proyectado
+(``mapped'') en memoria por otro proceso.
+.TP
+.B EDEADLK
+Se ha detectado que la orden
+.B F_SETLKW
+especificada provocaría un
+interbloqueo. 
+.TP
+.B EFAULT
+.I lock
+está fuera de su espacio de direcciones accesible.
+.TP
+.B EBADF
+.I fd
+no es un descriptor de fichero abierto
+o la orden era
+.B F_SETLK
+o
+.B F_SETLKW
+y el modo de apertura del descriptor de fichero no coincide con el
+tipo de bloqueo solicitado.
+.TP
+.B EINTR
+Para
+.BR F_SETLKW ,
+la orden ha sido interrumpida por una señal.
+Para
+.BR F_GETLK " y " F_SETLK ,
+la orden ha sido interrumpida por una señal antes de que el bloqueo se
+haya comprobado o adquirido. Esto ocurre con más probabilidad al poner
+un bloqueo en un fichero remoto (por ejemplo, un bloqueo sobre NFS)
+pero algunas veces puede ocurrir localmente.
+.TP
+.B EINVAL
+Para
+.BR F_DUPFD ,
+.I arg
+es negativo o mayor que el valor máximo permitido. Para
+.BR F_SETSIG ,
+.I arg
+no es un número de señal permitido.
+.TP
+.B EMFILE
+Para
+.BR F_DUPFD ,
+el proceso ya ha llegado al número máximo de descriptores de ficheros abiertos. 
+.TP
+.B ENOLCK
+Demasiados bloqueos de segmentos abiertos, la tabla de bloqueos está llena o
+ha fallado un protocolo de bloqueos remoto (por ejemplo, un bloqueo sobre
+NFS).
+.TP
+.B EPERM
+Se ha intentado quitar la bandera
+.B O_APPEND
+sobre un fichero que tiene activo el atributo de ``sólo añadir''
+(append-only).
+.SH OBSERVACIONES
+Los errores devueltos por
+.B dup2
+son distintos de aquéllos dados por 
+.BR F_DUPFD .
+
+Desde el núcleo 2.0, no hay interacción entre los tipos de bloqueo
+colocados por
+.BR flock (2)
+y
+.BR fcntl (2).
+
+POSIX 1003.1-2001 permite que
+.I l_len
+sea negativo. (Y si lo es, el intervalo descrito por el bloqueo cubre
+los bytes desde
+.IR l_start + l_len
+hasta
+.IR l_start -1
+inclusive.)
+Sin embargo, para los núcleos actuales, la llamada al sistema de Linux
+devuelve EINVAL en esta situación.
+
+Otros sistemas tienen más campos en
+.I "struct flock"
+como, por ejemplo,
+.IR l_sysid .
+Evidentemente,
+.I l_pid
+sólo no va a ser muy útil si el proceso que posee el bloqueo puede
+residir en una máquina diferente.
+
+.SH "CONFORME A"
+SVID, AT&T, POSIX, X/OPEN, BSD 4.3. Sólo las operaciones F_DUPFD,
+F_GETFD, F_SETFD, F_GETFL, F_SETFL, F_GETLK, F_SETLK y F_SETLKW
+se especifican en POSIX.1. F_GETOWN y F_SETOWN son BSD-ismos no
+aceptados en SVr4; F_GETSIG y F_SETSIG son específicos de Linux.
+.BR F_NOTIFY ", " F_GETLEASE " y " F_SETLEASE
+son específicos de Linux.
+(Defina la macro _GNU_SOURCE antes de incluir <fcntl.h> para obtener
+estas definiciones.)
+Las banderas legales para F_GETFL/F_SETFL son aquéllas que acepta
+.BR open (2)
+y varían entre estos sistemas; O_APPEND, O_NONBLOCK, O_RDONLY
+y O_RDWR son las que se mencionan en POSIX.1. SVr4 admite algunas
+otras opciones y banderas no documentadas aquí.
+.PP
+SVr4 documenta las condiciones de error adicionales EIO, ENOLINK y EOVERFLOW.
+.SH "VÉASE TAMBIÉN"
+.BR dup2 (2),
+.BR flock (2),
+.BR lockf (3),
+.BR open (2),
+.BR socket (2)
+.P
+Vea también locks.txt, mandatory.txt y dnotify.txt en
+/usr/src/linux/Documentation.

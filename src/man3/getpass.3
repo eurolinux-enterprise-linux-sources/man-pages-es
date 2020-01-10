@@ -1,0 +1,115 @@
+.\" Copyright (c) 2000 Andries Brouwer (aeb@cwi.nl)
+.\"
+.\" This is free documentation; you can redistribute it and/or
+.\" modify it under the terms of the GNU General Public License as
+.\" published by the Free Software Foundation; either version 2 of
+.\" the License, or (at your option) any later version.
+.\"
+.\" The GNU General Public License's references to "object code"
+.\" and "executables" are to be interpreted as the output of any
+.\" document formatting or typesetting system, including
+.\" intermediate and printed output.
+.\"
+.\" This manual is distributed in the hope that it will be useful,
+.\" but WITHOUT ANY WARRANTY; without even the implied warranty of
+.\" MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+.\" GNU General Public License for more details.
+.\"
+.\" You should have received a copy of the GNU General Public
+.\" License along with this manual; if not, write to the Free
+.\" Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111,
+.\" USA.
+.\"
+.\" Translated into Spanish Wed Jan 28 1998 by Gerardo Aburruzaga
+.\" García <gerardo.aburruzaga@uca.es>
+.\" Traducción revisada por Miguel Pérez Ibars <mpi79470@alu.um.es> el 19-marzo-2005
+.\"
+.TH GETPASS 3  "5 diciembre 2000" "Página de manual de Linux" "Manual del Programador de Linux"
+.SH NOMBRE
+getpass \- obtiene una contraseña
+.SH SINOPSIS
+.B #include <unistd.h>
+.sp
+.B "char *getpass( const char *" prompt );
+.SH DESCRIPCIÓN
+Esta función está obsoleta. No la utilice.
+.PP
+La función
+.BR getpass ()
+abre el fichero
+.I /dev/tty
+(la terminal de control del proceso), escribe la cadena
+.IR prompt ,
+desactiva el eco, lee una linea (la "contraseña"),
+restablece el estado de la terminal y cierra
+.I /dev/tty
+de nuevo.
+.SH "VALOR DEVUELTO"
+La función
+.B getpass
+devuelve un puntero a un buffer estático que contiene 
+(los primeros PASS_MAX bytes de) la contraseña sin el carácter nueva línea,
+terminada en NUL.
+Este buffer puede ser sobreescrito por una llamada posterior.
+En caso de error, el estado de la terminal se restablece,
+se pone un valor adecuado en
+.I errno
+, y se devuelve NULL.
+.SH ERRORES
+La función puede fallar si
+.TP
+.B ENXIO
+El proceso no tiene una terminal de control.
+.SH OBSERVACIONES
+Para libc4 y libc5, el prompt no se escribe en
+.I /dev/tty
+sino en
+.IR stderr .
+Además, si
+.I /dev/tty
+no puede abrirse, la contraseña es leída de
+.IR stdin .
+El buffer estático tiene de longitud 128 por lo que solamente
+se devuelven los primeros 127 bytes de la contraseña.
+Mientras se lee la contraseña, la generación de señales (SIGINT, SIGQUIT,
+SIGSTOP, SIGTSTOP) es desactivada y los carácteres correspondientes
+(normalmente control-C, control-\e, control-Z y control-Y)
+son transmitidos como parte de la contraseña.
+A partir de la versión 5.4.19 de libc también se ha deshabilitado
+la edición de la linea, así que también el espacio será visto como
+parte de la contraseña.
+.\" Since libc 5.4.19 also line editing is disabled, so that also
+.\" backspace and  >> the like << (¿?) will be seen as part of the password.
+.PP
+Para glibc2, si
+.I /dev/tty
+no puede abrirse, el prompt se escribe en
+.I stderr
+y la contraseña es leida de
+.IR stdin .
+No hay límite en la longitud de la contraseña.
+La edición de la línea no está deshabilitada.
+.PP
+Según el estándar SUSv2, el valor de PASS_MAX debe estar definido en
+.I <limits.h>
+en caso de que sea menor que 8, y puede ser obtenido en cualquier caso usando
+.IR sysconf(_SC_PASS_MAX) .
+Sin embargo, retira las constantes PASS_MAX
+y _SC_PASS_MAX, y la función
+.B getpass ().
+Libc4 y libc5 no han soportado nunca PASS_MAX ni _SC_PASS_MAX.
+Glibc2 acepta _SC_PASS_MAX y devuelve BUFSIZ (p.e., 8192).
+.SH FICHEROS
+.I /dev/tty
+.SH "VÉASE TAMBIÉN"
+.BR crypt (3)
+.SH HISTORIA
+Una función 
+.B getpass
+apareció en AT&T UNIX Versión 7.
+.SH FALLOS
+El proceso que llama a esta función debería poner a cero todos los
+caracteres de la contraseña tan pronto como le fuera posible para
+evitar dejar la contraseña sin cifrar visible en el espacio de
+direcciones del proceso.
+

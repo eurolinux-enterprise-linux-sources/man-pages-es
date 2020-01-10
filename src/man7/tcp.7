@@ -1,0 +1,683 @@
+.\" This man page is Copyright (C) 1999 Andi Kleen <ak@muc.de>.
+.\" Permission is granted to distribute possibly modified copies
+.\" of this page provided the header is included verbatim,
+.\" and in case of nontrivial modification author and date
+.\" of the modification is added to the header.
+.\"
+.\" Translated on Mon Jul 5 1999 by Juan Piernas <piernas at ditec.um.es>
+.\" Translation revised Fri Apr 21 2000 by Juan Piernas <piernas at ditec.um.es>
+.\" Translation revised Fri May 13 2005 by Juan Piernas <piernas at ditec.um.es>
+.\"
+.TH TCP  7 "20 abril 2002" "Página man de Linux" "Manual del Programador de Linux"
+.SH NOMBRE
+tcp \- Protocolo TCP.
+.SH SINOPSIS
+.B #include <sys/socket.h>
+.br
+.B #include <netinet/in.h>
+.br
+.B tcp_socket = socket(PF_INET, SOCK_STREAM, 0); 
+.SH DESCRIPCIÓN
+Ésta es una implementación del protocolo TCP definido en RFC793, RFC1122 y
+RFC2001 con las extensiones NewReno y SACK. Proporciona una conexión
+bidireccional, fiable y orientada a conexión entre dos conectores
+(``sockets'') encima de
+.BR ip (7),
+tanto para la versión 4 como para la versión 6.
+TCP garantiza que los datos llegan en orden y retransmite los paquetes
+perdidos. Genera y comprueba una suma de verificación por paquete para
+detectar errores de transmisión. TCP no conserva los límites entre
+registros.
+
+Un conector TCP recién creado no tiene ni dirección remota ni local y no
+está totalmente especificado. Para crear una conexión TCP de salida use
+.BR connect (2)
+para establecer una conexión con otro conector TCP. Para recibir nuevas
+conexiones de entrada, primero enlace el conector a una dirección local y
+puerto mediante
+.BR bind (2)
+y a continuación llame a
+.BR listen (2)
+para colocar el conector en estado de escucha. Después de esto, se puede
+aceptar un nuevo conector para cada conexión de entrada usando
+.BR accept (2).
+Un conector sobre el que se han ejecutado con éxito
+.B accept
+o 
+.B connect
+está totalmente especificado y puede transmitir datos. No se pueden
+transmitir datos a través de conectores en estado de escucha o no conectados
+todavía.
+
+La versión 2.2 de Linux soporta las extensiones RFC1323 para TCP de alto
+rendimiento. Estas incluyen protección contra la repetición de números
+de secuencia (PAWS, ``Protection Against Wrapped Sequence Numbers''),
+ampliación de ventana (``Window Scaling'') y fechados
+(``Timestamps''). La ampliación de ventana permite el uso de
+grandes ventanas TCP (> 64K) para dar soporte a enlaces con
+una alta latencia o un gran ancho de banda.
+Para usarlas, se deben incrementar los tamaños de los buffers de envío y
+recepción. Se pueden configurar globalmente con las variables sysctls
+.B net.ipv4.tcp_wmem
+y
+.BR net.ipv4.tcp_rmem ,
+o para cada conector individual mediante las opciones de conector
+.B SO_SNDBUF 
+y 
+.B SO_RCVBUF
+con la llamada
+.BR setsockopt (2).
+
+Los tamaños máximos de los buffers de los conectores declarados
+a través de
+.B SO_SNDBUF
+y
+.B SO_RCVBUF 
+están limitados por las sysctls globales
+.B net.core.rmem_max
+y
+.BR net.core.wmem_max .
+Dese cuenta que TCP realmente asigna dos veces el tamaño del buffer
+solicitado en la llamada
+.BR setsockopt (2),
+por lo que una llamada con éxito a
+.BR getsockopt (2) 
+no devolverá el mismo tamaño de buffer que el solicitado en la llamada
+.BR setsockopt (2) .
+TCP usa esto para propósitos administrativos y estructuras internas
+del núcleo, y las variables sysctl reflejan los tamaños mayores
+comparados con las ventanas TCP actuales. Para las conexiones
+individuales, el tamaño del buffer del conector se debe establecer
+antes de las llamadas
+.B listen()
+o 
+.B connect()
+para que tenga efecto. Vea
+.BR socket (7)
+para más información.
+.PP
+TCP soporta datos urgentes. Los datos urgentes se usan para indicar al
+receptor que algún mensaje importante es parte del flujo de datos y que debe
+ser procesado tan pronto como sea posible.
+Para enviar datos urgentes, especifique la opción
+.B MSG_OOB
+en
+.BR send (2).
+Cuando se reciben datos urgentes, el núcleo envía una señal
+.B SIGURG
+al proceso lector o al proceso o grupo de procesos que han sido
+configurados para el conector usando la ioctl
+.B SIOCSPGRP
+o 
+.BR FIOSETOWN .
+Cuando la opción de conector
+.B SO_OOBINLINE
+está activa, los datos urgentes se colocan en el flujo normal de datos (y se
+pueden examinar mediante la ioctl
+.BR SIOCATMARK ).
+En otro caso, sólo se pueden recibir cuando se ha configurado la opción
+.B MSG_OOB
+en
+.BR sendmsg (2).
+
+La versión 2.4 de Linux introdujo varios cambios para mejorar el
+rendimiento y la escalabilidad, además de una funcionalidad mejorada.
+Algunas de estas características incluyen soporte para llamadas
+.BR sendfile (2)
+sin copias internas de datos, Notificación Explícita de
+Congestión, nueva gestión de conectores TIME_WAIT, opciones
+``keep-alive'' y soporte para extensiones de SACK Duplicados.
+.SH "FORMATO DE LAS DIRECCIONES"
+TCP está construido encima de IP (vea
+.BR ip (7)).
+Los formatos de dirección definidos por
+.BR ip (7)
+se aplican a TCP. TCP sólo soporta comunicaciones punto a punto. La difusión
+y el envío multidestino no están soportados.
+.SH SYSCTLS
+Estas variables pueden ser accedidas mediante los ficheros
+.B /proc/sys/net/ipv4/* 
+o con la interfaz
+.BR sysctl (2).
+Además, las mayoría de las sysctls de IP también se aplican a TCP. Vea
+.BR ip (7). 
+.TP
+.B tcp_abort_on_overflow
+Activa el reinicio de conexiones si el servicio que escucha es
+demasiado lento y es incapaz de continuar y aceptarlas. No está activo
+por omisión. Significa que si se produjera un desbordamiento debido a
+una ráfaga de datos, la conexión se recuperará. Active esta opción
+«sólo» si verdaderamente está seguro de que el demonio que escucha no
+puede ser ajustado para aceptar conexiones más rápidamente. Activar
+esta opción puede perjudicar a los clientes de su servidor.
+.TP
+.B tcp_adv_win_scale
+Considera que el gasto del almacenamiento temporal es
+bytes/2^tcp_adv_win_scale (si tcp_adv_win_scale > 0) o
+bytes-bytes/2^(-tcp_adv_win_scale) si el valor es <= 0. El valor por
+omisión es 2.
+
+El espacio del buffer de recepción del conector se comparte entre la
+aplicación y el núcleo. TCP mantiene parte del buffer como ventana
+TCP; éste es el tamaño de la ventana de recepción que se comunica al
+otro extremo. El resto del espacio se usa como ``buffer de
+aplicación'', usado para aislar a la red de latencias de planificación
+y de la aplicación. El valor 2 por omisión de
+.B tcp_adv_win_scale
+implica que el espacio usado para el buffer de aplicación es un cuarto
+del total.
+.TP 
+.B tcp_app_win
+Esta variable define cuántos bytes de la ventana TCP se reservan para
+el gasto del almacenamiento temporal.
+
+La cantidad de bytes de la ventana que se reservan para el buffer de
+la aplicación es el máximo de (window/2^tcp_app_win, mss). 0 significa
+que no se reserva ninguna cantidad. El valor por omisión es 31.
+.TP
+.B tcp_dsack
+Activa el soporte para SACK Duplicados TCP según se describen en
+RFC2883. Está activo por omisión.
+.TP
+.B tcp_ecn
+Activa la Notificación Explícita de Congestión (ECN,
+Explicit Congestion Notification), descrita en el RFC2884.
+No está activa por omisión. Cuando está activa, se podría ver afectada
+la conectividad a algunos destinos debido a la existencia a lo largo
+de la ruta de enrutadores antiguos con un comportamiento defectuoso,
+los cuales provocarían la pérdida de conexiones.
+.TP
+.B tcp_fack
+Activa el soporte para el Reconocimiento Adelantado (``Forward
+Acknowledgement'') TCP. Por omisión, está activo.
+.TP
+.B tcp_fin_timeout
+Cantidad de segundos a esperar un paquete FIN final antes de que el
+conector se cierre por la fuerza. Éstas es estrictamente una violación
+de la especificación TCP, pero se necesita para evitar ataques de
+denegación de servicio (DoS). El valor por omisión en los núcleos 2.4
+es 60, por debajo de los 180 segundos de la versión 2.2.
+.TP
+.B tcp_keepalive_intvl
+Número de segundos entre dos sondas ``keep-alive'' TCP. El valor por
+omisión es 75 segundos.
+.TP
+.B tcp_keepalive_probes
+Número máximo de sondas ``keep-alive'' TCP a enviar antes de
+abandonar y acabar con la conexión si no se obtiene respuesta desde el
+otro extremo. El valor por omisión es 9.
+.TP
+.B tcp_keepalive_time
+Número de segundos que una conexión necesita estar inactiva antes de
+que TCP comience a enviar sondas ``keep-alive''. Estas sondas sólo se
+envían cuando la opción de conector
+.B SO_KEEPALIVE
+está activa. El valor por omisión es 7200 segundos (2 horas). Una
+conexión inactiva se termina después de aproximadamente otros 11
+minutos (9 sondas a intervalos de 75 segundos) cuando está activo el
+envío de sondas ``keep-alive''.
+
+Dese cuenta que los mecanismos subyacentes de seguimiento de
+conexiones y los plazos de tiempo de las aplicaciones pueden ser mucho
+más pequeños.
+.TP
+.B tcp_max_orphans
+Número máximo de conectores TCP huérfanos (no conectados a ningún
+manejador de fichero de usuario) que se permiten en el sistema. Cuando
+se sobrepasa este número, la conexión huérfana se reinicia y se
+muestra un aviso. Este límite existe sólo para evitar ataques DoS
+sencillos. No se recomienda reducir este límite. Las condiciones de la
+red podría hacer necesario que incremente el número de huérfanos
+permitidos, pero dese cuenta que cada huérfano puede gasta hasta ~64K
+de memoria no intercambiable. El valor por omisión inicial es igual al
+parámetro del núcleo NR_FILE. Este valor se ajusta dependiendo de la
+memoria del sistema.
+.TP
+.B tcp_max_syn_backlog
+Número máximo de peticiones de conexión encoladas que todavía no han
+recibido un reconocimiento desde el cliente que se está conectando. Si
+este número se supera, el núcleo comenzará a eliminar peticiones. El
+valor por omisión de 256 se incrementa a 1024 cuando la memoría que
+hay en el sistema es adecuada o grande (>= 128Mb) y se reduce a 128 en
+aquellos sistemas con muy poca memoria (<= 32Mb). Si se necesita
+incrementar este valor por encima de 1024, se recomienda que se
+modifique TCP_SYNQ_HSIZE para mantener
+TCP_SYNQ_HSIZE*16<=tcp_max_syn_backlog y que se recompile el núcleo.
+.TP
+.B tcp_max_tw_buckets
+Número máximo de conectores en el estado TIME_WAIT admitidos por el
+sistema. Este límite existe sólo para evitar ataques DoS sencillos. El
+valor por omisión de NR_FILE*2 se ajusta dependiendo de la memoria que
+haya en el sistema. Si este número se supera, se cierra el conector y
+se muestra una aviso.
+.TP 
+.B tcp_mem
+Este es un vector de 3 enteros: [low, pressure, high].  Estos límites
+los usa TCP para hacer un seguimiento de su uso de memoria. Los
+valores por omisión se calculan durante el arranque a partir de la
+cantidad de memoria disponible.
+
+.I low 
+- TCP no regula su asignación de memoria cuando el número de páginas
+que ha asignado globalmente está por debajo de este número.
+
+.I pressure
+- cuando la cantidad de memoria asignada por TCP supera este número de
+páginas, TCP modera su consumo de memoria. Este estado de presión de
+memoria se termina una vez que el número de páginas asignadas cae por
+debajo de la marca
+.BR low .
+
+.I high
+- número máximo de páginas que TCP asignará de forma global. Este
+valor invalida cualquier otro límite impuesto por el núcleo.
+.TP
+.B tcp_orphan_retries
+Número máximo de intentos realizados para sondear el otro extremo de
+una conexión que ha sido cerrada por nuestro extremo. El valor por
+omisión es 8.
+.TP
+.B tcp_reordering
+El máximo que un paquete puede ser reorganizado en un flujo de paquetes
+TCP sin que TCP asuma pérdida de paquetes y sin que se ponga a hacer
+un lento inicio. El valor por omisión es 3. No es aconsejable cambiar
+este número. Ésta es una métrica de detección de reorganización de
+paquetes diseñada para minimizar retrocesos y retransmisiones
+innecesarios provocados por la reorganización de paquetes en una
+conexión.
+.TP
+.B tcp_retrans_collapse
+Intentar enviar paquetes de tamaño máximo durante las retransmisiones.
+Esto está activo por defecto.
+.TP
+.B tcp_retries1
+Número de veces que TCP intentará retransmitir un paquete en una
+conexión establecida normalmente, sin el esfuerzo extra de que se
+involucren las capas de red. Una vez se supera este número de
+retransmisiones, primero hacemos que la capa de red actualice la ruta
+si es posible antes de cada nueva retransmisión. El valor por omisión
+es 3, el mínimo especificado en el RFC.
+.TP
+.B tcp_retries2
+Número máximo de veces que un paquete TCP se retransmite con estado
+``establecido'' antes de abandonarlo. El valor por omisión es 15, que
+corresponde a una duracción de, aproximadamente, entre 13 y 30
+minutos, dependiendo del plazo de retransmisión. El límite mínimo de
+100 segundos especificado por RFC1122 normalmente se considera
+demasiado pequeño.
+.TP
+.B tcp_rfc1337
+Activa el comportamiento TCP que se ajusta al RFC 1337. Esto no está
+activo por omisión. Cuando no está activo, si se recibe un RST en un
+estado TIME_WAIT, cerramos el conector inmediatamente sin esperar el
+fin del periodo TIME_WAIT.
+.TP
+.B tcp_rmem
+Éste es un vector de 3 enteros: [min, default,
+max]. Estos parámetros los usa TCP para regular los tamaños de los
+buffers de recepción. TCP ajusta dinámicamente el tamaño del buffer de
+recepción a partir de los valores por omisión listados más abajo, en
+el rango de estas variables sysctl, dependiendo de la memoria
+disponible en el sistema.
+
+.I min
+- tamaño mínimo del buffer de recepción usado por cada conector TCP.
+El valor por omisión es 4K y se reduce a PAGE_SIZE bytes en sistemas
+con poca memoria. Este valor se usa para asegurar que, en el modo de
+presión de memoria, las asignaciones de memoria por debajo de este
+tamaño todavía tendrán éxito. Esto no se usa para limitar el tamaño
+del buffer de recepción declarado usando
+.B SO_RCVBUF
+en un conector.  
+
+.I default
+- el tamaño por omisión del buffer de recepción de un conector TCP.
+Este valor sobrescribe el tamaño por omisión inicial del buffer que
+viene dado por el valor genérico global
+.BR net.core.rmem_default ,
+definido para todos los protocolos. El valor por omisión es de 87380
+bytes y se reduce a 43689 en sistemas con poca memoria. Si se desean
+tamaños de buffers de recepción mayores, se debería incrementar este
+valor (para que afecte a todos los conectores). Para que se empleen
+ventanas TCP grandes, se debe activar (valor por omisión)
+.BR net.ipv4.tcp_window_scaling .
+
+.I max
+- tamaño máximo del buffer de recepción usado por cada conector TCP.
+Este valor no invalida el valor global
+.BR net.core.rmem_max .
+Esto no se usa para limitar el tamaño del buffer de recepción
+declarado usando
+.B SO_RCVBUF
+sobre un conector.
+El valor por omisión de 87380*2 bytes se reduce a 87380 en sistemas
+con poca memoria.
+.TP
+.B tcp_sack
+Activa los Reconocimientos Selectivos TCP descritos por el RFC2018.
+Esto está activo por omisión.
+.TP
+.B tcp_stdurg
+Activa la interpretación estricta RFC793 del campo puntero-urgente de
+TCP. El valor por omisión es usar la interpretación compatible con BSD
+del puntero urgente, que apunta al primer byte tras los datos
+urgentes. La interpretación RFC793 es hacer que apunte al último byte
+de los datos urgentes. Activar esta opción puede conducir a problemas
+de interoperatividad.
+.TP
+.B tcp_synack_retries
+Número máximo de veces que se retransmitirá un segmento SYN/ACK para
+una conexión TCP pasiva. Este número no debería ser mayor que 255. El
+valor por omisión es 5.
+.TP
+.B tcp_syncookies
+Activa los ``syncookies'' TCP. Se debe compilar el núcleo con
+.BR CONFIG_SYN_COOKIES .
+Envía ``syncookies'' cuando la cola de paquetes syn pendientes de un
+conector se desborda. Los ``syncookies'' intentan proteger a un
+conector de un ataque por la llegada en avalancha de paquetes SYN.
+Esto se debería usar como último recurso o nunca. Esto es una
+violación del protocolo TCP y entra en conflicto con otras áreas de
+TCP como las extensiones TCP. Puede producir problemas para clientes y
+nodos repetidores. No se recomienda como mecanismo de ajuste para
+ayudar a servidores muy cargados en condiciones de sobrecarga o de
+mala configuración. Para alternativas recomendadas, vea
+.BR tcp_max_syn_backlog ,
+.BR tcp_synack_retries ,
+.BR tcp_abort_on_overflow .
+.TP
+.B tcp_syn_retries
+Número máximo de veces que se retransmitirán SYNs iniciales para un
+intento activo de conexión TCP. Este valor no debería ser mayor que
+255. El valor por omisión es 5, que se corresponde a,
+aproximadamente, 180 segundos.
+.TP
+.B tcp_timestamps
+Activa fechados TCP según el RFC1323. Esto está activo por omisión.
+.TP
+.B tcp_tw_recycle
+Activa el reciclado rápido de conectores TIME-WAIT. No está activo por
+omisión. No se recomienda activar esta opción ya que produce problemas
+cuando se trabaja con NAT (Network Address Translation). 
+.TP
+.B tcp_window_scaling
+Activa la ampliación de ventanas TCP según el RFC1323. Esto está
+activo por omisión. Esta característica permite el uso de una ventana
+grande (> 64K) en conexiones TCP, aunque el otro extremo debería
+soportarla. Normalmente, el campo de 16 bit de longitud de ventana en
+la cabecera TCP limita el tamaño de ventana a menos de 64K bytes. Si
+se desean ventanas mayores, las aplicaciones pueden incrementar el
+tamaño de sus buffers de conectores y se empleará la opción de
+ampliación de ventanas. Si
+.B tcp_window_scaling 
+se desactiva, TCP no negociará el uso de la ampliación de ventanas con
+el otro extremo durante el establecimiento de la conexión.
+.TP
+.B tcp_wmem
+Éste es un vector de 3 enteros: [min, default, max]. Estos parámetros
+los usa TCP para regular los tamaños de los buffers de envío. TCP
+ajusta dinámicamente el tamaño del buffer de envío a partir de los
+valores por omisión listados más abajo, en el rango de estas variables
+sysctl, dependiendo de la memoria disponible en el sistema.
+
+.I min
+- tamaño mínimo del buffer de envío usado por cada conector TCP. El
+valor por omisión es de 4K bytes. Este valor se usa para asegurar que,
+en el modo de presión de memoria, las asignaciones de memoria por
+debajo de este tamaño todavía tendrán éxito. Esto no se usa para
+limitar el tamaño del buffer de envío declarado usando
+.B SO_SNDBUF
+en un conector.
+
+.I default
+- el tamaño por omisión del buffer de envío un conector TCP.
+Este valor sobrescribe el tamaño por omisión inicial del buffer que
+viene dado por el valor genérico global
+.BR net.core.wmem_default ,
+definido para todos los protocolos. El valor por omisión es de 16K.
+Si se desean tamaños de buffers de envío mayores, se debería
+incrementar este valor (para que afecte a todos los conectores). Para
+que se empleen ventanas TCP grandes, se debe activar (valor por
+omisión) la variable sysctl.
+.BR net.ipv4.tcp_window_scaling .
+
+.I max
+- tamaño máximo del buffer de envío usado por cada conector TCP.
+Este valor no invalida el valor global
+.BR net.core.wmem_max .
+Esto no se usa para limitar el tamaño del buffer de envío
+declarado usando
+.B SO_SNDBUF
+sobre un conector.
+El valor por omisión de 128K bytes. Se reduce a 64K dependiendo de la
+memoria disponible en el sistema.
+.SH "OPCIONES DE LOS CONECTORES"
+Para establecer u obtener la opción de un conector TCP, llame a
+.BR getsockopt (2)
+para leerla o a
+.BR setsockopt (2)
+para escribirla, asignando
+.BR SOL_TCP .
+al argumento del nivel de opción.
+Además, la mayoría de las opciones de conector
+.B SOL_IP 
+son válidas para conectores TCP. Para más información vea
+.BR ip (7).
+.TP
+.B TCP_CORK
+Si se activa, no se envían tramas parciales. Todas las tramas
+parciales encoladas se envían cuando esta opción se desactiva de
+nuevo. Es útil para añadir cabeceras antes de llamar a
+.BR sendfile (2)
+o para optmizar el rendimiento. Esta opción no se puede combinar con
+.BR TCP_NODELAY.
+No debería usar esta opción si desea que su código sea transportable.
+.TP
+.B TCP_DEFER_ACCEPT
+Permite despertar a un proceso oyente sólo cuando lleguen datos
+al conector. Toma un valor entero (segundos). Puede limitar el número
+máximo de intentos que hará TCP para terminar de establecer la
+conexión. No debería usar esta opción si desea que su código sea
+transportable.
+.TP
+.B TCP_INFO
+Se usa para recoger información sobre este conector. El núcleo
+devuelve una estructura tcp_info como la que se define en el fichero
+/usr/include/linux/tcp.h.
+No debería usar esta opción si desea que su código sea transportable.
+.TP
+.B TCP_KEEPCNT
+Número máximo de sondas ``keep-alive'' que TCP debería enviar antes de
+abandonar la conexión.
+No debería usar esta opción si desea que su código sea transportable.
+.TP
+.B TCP_KEEPIDLE
+Tiempo (en segundos) que la conexión necesita estar ociosa antes de
+que TCP empiece a enviar sondas ``keep-alive'' si la opción de conector
+SO_KEEPALIVE se ha activado en este conector.
+No debería usar esta opción si desea que su código sea transportable.
+.TP
+.B TCP_KEEPINTVL
+Tiempo (en segundos) entre sondas ``keep-alive''.
+No debería usar esta opción si desea que su código sea transportable.
+.TP
+.B TCP_LINGER2
+Tiempo de vida de conectores que han quedado huérfanos en estado
+FIN_WAIT2. Esta opción se puede usar para invalidar la sysctl global
+del sistema
+.B tcp_fin_timeout
+en este conector. No confundir con la opción
+.BR SO_LINGER
+del nivel de conectores
+.RB ( socket (7)).
+No debería usar esta opción si desea que su código sea transportable.
+.TP
+.B TCP_MAXSEG
+Tamaño máximo de segmento para los paquetes TCP de salida. Si se
+establece esta opción antes del establecimiento de conexiones, también
+cambia el valor MSS anunciado al otro extremo en el paquete inicial.
+Valores mayores que la MTU de la interfaz que finalmente se use no
+tienen efecto. TCP también impondrá sus límites mínimo y máximo sobre
+el valor dado.
+.TP
+.B TCP_NODELAY
+Si se usa, desactiva el algoritmo de Nagle. Esto significa que los
+segmentos siempre se envían tan pronto como sea posible, aunque sólo
+haya una pequeña cantidad de datos. Cuando no se usa, los datos se
+almacenan temporalmente hasta que haya una cantidad suficiente para
+ser enviada, evitando así el envío frecuente de pequeños paquetes que
+ocasiona una pobre utilización de la red. Esta opción no se puede usar
+a la misma vez que la opción
+.BR TCP_CORK . 
+.TP
+.B TCP_QUICKACK
+Activa el modo ``quickack'' cuando se pone a 1 y lo desactiva cuando
+se pone a 0. En el modo ``quickack'', los reconocimientos se envían
+inmediatamente, antes de retrasarlos si es necesario conforme a
+un funcionamiento normal de TCP. Esta opción no es permanente, sólo
+permite un cambio a o desde el modo ``quickack''. Las operaciones
+posteriores del protocolo TCP entrarán/saldrán otra vez del modo
+``quickack'' dependiendo del procesamiento interno del protocolo y de
+factores tales como la expiración de plazos de reconocimientos
+retrasados y la transferencia de datos.
+No debería usar esta opción si desea que su código sea transportable.
+.TP
+.B TCP_SYNCNT
+Establece el número de retransmisiones SYN que debe enviar TCP antes
+de abortar el intento de conexión. No puede exceder de 255.
+No debería usar esta opción si desea que su código sea transportable.
+.TP
+.B TCP_WINDOW_CLAMP
+Limita el tamaño de la ventana anunciada a este valor. El núcleo
+impone un tamaño mínimo de SOCK_MIN_RCVBUF/2.
+No debería usar esta opción si desea que su código sea transportable.
+.SH IOCTLS
+Estas ioctls pueden ser accedidas usando
+.BR ioctl (2).
+La sintaxis correcta es:
+.PP
+.RS
+.nf
+.BI int " value";
+.IB error " = ioctl(" tcp_socket ", " ioctl_type ", &" value ");"
+.fi
+.RE
+.TP
+.B SIOCINQ
+Devuelve la cantidad de datos encolados sin leer en el buffer de recepción.
+El argumento es un puntero a un entero. El conector no debe estar en
+estado LISTEN, de lo contrario se devolverá un error (EINVAL).
+.TP
+.B SIOCATMARK
+Devuelve cierto cuando el programa de usuario ya ha recibido todos los datos
+urgentes. Esto se usa junto con
+.BR SO_OOBINLINE .
+El argumento es un puntero a un entero para el resultado de la comprobación.
+.TP
+.B SIOCOUTQ
+Devuelve la cantidad de datos sin enviar en la cola de envío del conector
+en el puntero a un valor entero pasado. El conector no debe estar en
+estado LISTEN, de lo contrario se devolverá un error (EINVAL).
+.SH "MANEJO DE ERRORES"
+Cuando se produce un error de red, TCP intenta reenviar el paquete. Si no
+tiene éxito después de un cierto tiempo, informa o bien de un error
+.B ETIMEDOUT
+o bien del último error recibido sobre esta conexión.
+.PP
+Algunas aplicaciones necesitan una notificación más rápida del error. Esto
+se puede hacer con la opción de conector
+.B IP_RECVERR
+del nivel
+.BR SOL_IP .
+Cuando se activa esta opción, todos los errores de entrada son pasado
+inmediatamente al programa de usuario. Use esta opción con cuidado (hace que
+TCP sea menos tolerante a cambios de enrutamiento y a otras condiciones de
+red normales).
+.SH OBSERVACIONES
+Cuando se produce un error, al configurar una conexión, durante la escritura
+en un conector, sólo se produce una señal
+.B SIGPIPE
+cuando está activa la opción de conector
+.BR SO_KEEPALIVE .
+.PP
+TCP no posee verdaderos datos fuera de orden, posee datos urgentes. En Linux
+esto significa que si el otro extremo envía datos fuera de orden recientes,
+los anteriores datos urgentes se insertarán como datos normales en el flujo
+(incluso cuando
+.B SO_OOBINLINE
+no está activa). Esto difiere de las pilas de protocolo basadas en BSD.
+.PP
+Linux usa por defecto una interpretación del campo puntero urgente
+compatible con BSD. Esto viola el RFC1122 pero se necesita por
+interoperatividad con otras pilas. Se puede cambiar con la sysctl
+.BR tcp_stdurg .
+.SH ERRORES
+.TP
+.B EPIPE
+El otro extremo ha cerrado el conector inesperadamente o se ha intentado
+leer de un conector desconectado.
+.TP
+.B ETIMEDOUT
+El otro extremo no ha reconocido los datos retransmitidos después de cierto
+tiempo.
+.TP
+.B EAFNOTSUPPORT
+El tipo de dirección de conector pasado en
+.I sin_family 
+no es 
+.BR AF_INET .
+.PP
+TCP también puede devolver cualquier error definido por
+.BR ip (7)
+o la capa de conectores genéricos.
+.SH FALLOS
+No se han documentado todos los errores.
+.br
+No se ha descrito IPv6.
+.\" Only a single Linux kernel version is described
+.\" Info for 2.2 was lost. Should be added again,
+.\" or put into a separate page.
+.SH VERSIONES
+El soporte para la Notificación Explícita de la Congestión, sendfile
+sin copias internas de datos, la reorganización de paquetes y algunas
+extensiones SACK (DSACK) se introdujo en la versión 2.4.
+El soporte para el Reconocimiento Adelantado (FACK), el reciclado de
+conectores en estado TIME_WAIT, opciones ``keep-alive'' para conexiones
+individuales y las sysctls se introdujo en la versión 2.3.
+
+Los valores por omisión y las descripciones de la variables sysctl
+dados más arriba son aplicables para la versión 2.4 del núcleo.
+.SH AUTORES
+Esta página de manual fue escrita originariamente por Andi Kleen.
+Nivedita Singhvi la actualizó para la versión 2.4 de Linux con la
+información del documento Documentation/networking/ip-sysctls.txt
+de Alexey Kuznetsov.
+.SH "VÉASE TAMBIÉN"
+.BR socket (7),
+.BR socket (2),
+.BR ip (7),
+.BR bind (2), 
+.BR listen (2),
+.BR accept (2),
+.BR connect (2),
+.BR sendmsg (2),
+.BR recvmsg (2),
+.BR sendfile (2),
+.BR sysctl (2),
+.BR getsockopt (2).
+.sp
+RFC793 para la especificación de TCP.
+.br
+RFC1122 para los requisitos de TCP y una descripción del algoritmo Nagle.
+.br
+RFC1323 para las opciones TCP de fechado y de ampliación de ventana.
+.br
+RFC1644 para una descripción de los peligros que conlleva el ``asesinato'' de los
+conectores TIME_WAIT.
+.br
+RFC2481 para una descripción de la Notificación Explícita de la
+Congestión.
+.br
+RFC2581 para los algoritmos TCP de control de la congestión.
+.br
+RFC2018 y RFC2883 para SACK y sus extensiones.

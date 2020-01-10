@@ -1,0 +1,335 @@
+.\" Hey Emacs! This file is -*- nroff -*- source.
+.\"
+.\" Copyright (C) 1993 Rickard E. Faith <faith@cs.unc.edu>
+.\" Copyright (C) 1994 Andries E. Brouwer <aeb@cwi.nl>
+.\" Copyright (C) 2002 Michael Kerrisk <mtk16@ext.canterbury.ac.nz>
+.\"
+.\" Permission is granted to make and distribute verbatim copies of this
+.\" manual provided the copyright notice and this permission notice are
+.\" preserved on all copies.
+.\"
+.\" Permission is granted to copy and distribute modified versions of this
+.\" manual under the conditions for verbatim copying, provided that the
+.\" entire resulting derived work is distributed under the terms of a
+.\" permission notice identical to this one
+.\" 
+.\" Since the Linux kernel and libraries are constantly changing, this
+.\" manual page may be incorrect or out-of-date.  The author(s) assume no
+.\" responsibility for errors or omissions, or for damages resulting from
+.\" the use of the information contained herein.  The author(s) may not
+.\" have taken the same level of care in the production of this manual,
+.\" which is licensed free of charge, as they might when working
+.\" professionally.
+.\" 
+.\" Formatted or processed versions of this manual, if unaccompanied by
+.\" the source, must acknowledge the copyright and authors of this work.
+.\" "
+.\" Modified Mon Nov  4 20:23:39 1996 by Eric S. Raymond <esr@thyrsus.com>
+.\" Modified 13 Oct 2001 by Michael Kerrisk <mtk16@ext.canterbury.ac.nz>
+.\"     Added note on historical behaviour of MS_NOSUID
+.\" Modified 16 May 2002 by Michael Kerrisk <mtk16@ext.canterbury.ac.nz>
+.\"     Extensive changes and additions
+.\" Some corrections, aeb, 27 May 2002
+.\" Modified 11 Jun 2002 by Michael Kerrisk <mtk16@ext.canterbury.ac.nz>
+.\"     Enhanced descriptions of MS_MOVE, MS_BIND, and MS_REMOUNT
+.\"
+.\" Translatd into Spanish Jan 08 1998 by Gerardo Aburruzaga García
+.\"	<gerardo.aburruzaga at uca.es>
+.\" Translation revised Fri Jun 25 1999 by Juan Piernas <piernas at ditec.um.es>
+.\" Translation revised Wed May  4 2005 by Juan Piernas <piernas at ditec.um.es>
+.\"
+.TH MOUNT 2 "11 junio 2002" "Linux 2.5" "Manual del Programador de Linux"
+.SH NOMBRE
+mount, umount \- monta y desmonta sistemas de ficheros.
+.SH SINOPSIS
+.B "#include <sys/mount.h>"
+.sp
+.BI "int mount(const char *" fuente ", const char *" destino ,
+.BI "const char *" tipo_sf ", unsigned long " opciones ,
+.BI "const void *" datos );
+.sp
+.BI "int umount(const char *" destino );
+.sp
+.BI "int umount2(const char *" destino ", int " opciones );
+.SH DESCRIPCIÓN
+.B mount
+une el sistema de ficheros especificado por
+.I fuente
+(que frecuentemente es un nombre de dispositivo, pero que puede ser
+también un nombre de directorio o un dispositivo virtual)
+al directorio especificado por
+.IR destino .
+
+.B umount " y " umount2
+eliminan la unión del sistema de ficheros (el que hay arriba del todo) que se
+encuentra montado en
+.IR destino .
+
+Sólo el super-usuario puede montar y desmontar sistemas de ficheros. A
+partir de la versión 2.4 de Linux, un mismo sistema de ficheros puede
+ser visible en multiples puntos de montaje y se pueden realizar varios
+montajes en el mismo punto de montaje, apilando unos sobre otros.
+.\" Multiple mounts on same mount point: since 2.3.99pre7.
+
+Los valores para el argumento
+.IR tipo_sf
+que soporta el núcleo se listan en el fichero
+.I /proc/filesystems
+(como "minix", "ext2", "msdos", "proc", "nfs", "iso9660", etc.).
+Es posible que aparezcan tipos adicionales cuando
+se carguen los módulos apropiados.
+
+El argumento
+.IR opciones
+puede tener el número mágico 0xC0ED (\fBMS_MGC_VAL\fP) en los 16 bits
+más significativos (esto era necesario en las versiones del núcleo
+anteriores a la 2.4, pero ya no se necesita y se ignora si se
+especifica) y varias opciones de montaje (como las definidas en
+<linux/fs.h> para libc4 y libc5 y en <sys/mount.h> para glibc2) en los
+16 bits menos significativos:
+.TP
+.B MS_BIND
+(Linux 2.4 y siguientes)
+.\" since 2.4.0-test9
+Realiza un montaje «de ligadura» (\fIbind\fR), lo que hace que un
+subárbol de ficheros o de directorios sea visible en otro punto dentro
+de un sistema de ficheros. Los montajes de ligadura pueden cruzar los
+límites de los sistemas de ficheros y atravesar «jaulas»
+.BR chroot (2).
+Los argumentos
+.IR tipo_sf ", " opciones " y " datos
+se ignoran.
+.\" with the exception of the "hidden" MS_REC mountflags bit
+.TP
+.B MS_DIRSYNC
+(Desde Linux 2.5.19.)
+Hace que los cambios en los directorios de este sistema de ficheros
+sean síncronos.
+(Esta propiedad la pueden obtener los directorios o subárboles
+individuales usando
+.BR chattr (8).)
+.TP
+.B MS_MANDLOCK
+Permite bloqueos obligatorios sobre los ficheros de este sistema de
+ficheros. (Los bloqueos obligatorios todavía deben habilitarse fichero
+a fichero, de la forma que se describe en
+.BR fcntl (2).)
+.\" FIXME: More can be said about MS_MOVE
+.TP
+.B MS_MOVE
+Mueve un subárbol.
+.I fuente
+especifica un punto de montaje existente y
+.I destino
+especifica la nueva posición.
+El movimiento es atómico: en ningún momento se desmonta el subárbol.
+Los argumentos
+.IR tipo_sf ", " opciones " y " datos
+se ignoran.
+.TP
+.B MS_NOATIME
+No actualiza el tiempo de acceso para los ficheros (de cualquier tipo)
+en este sistema de ficheros.
+.TP
+.B MS_NODEV
+No permite el acceso a los dispositivos (ficheros especiales) en este
+sistema de ficheros.
+.TP
+.B MS_NODIRATIME
+No actualiza el tiempo de acceso para los directorios en este sistema
+de ficheros.
+.TP
+.B MS_NOEXEC
+No permite que los programas se ejecuten desde este sistema de
+ficheros.
+.\" (Possibly useful for a file system that contains non-Linux executables.
+.\" Often used as a security feature, e.g. to make sure that restricted
+.\" users cannot execute files uploaded using ftp or so.)
+.TP
+.B MS_NOSUID
+No hace caso a los bits set-UID y set-GID cuando se ejecutan programas
+desde este sistema de ficheros.
+.\" (This is a security feature to prevent users executing set-UID and
+.\" set-GID programs from removable disk devices.)
+.TP
+.B MS_RDONLY
+Monta el sistema de ficheros para sólo lectura.
+.TP
+.B MS_REMOUNT
+Remonta un montaje existente. Esto le permite cambiar el valor de
+.I opciones
+y
+.I datos
+de un montaje existente sin tener que desmontar y remontar el sistema
+de ficheros.
+.I fuente
+y
+.I destino
+deben ser los mismos valores que los especificados en la llamada
+.BR mount ()
+inicial;
+.I tipo_sf
+se ignora.
+.TP
+.B MS_SYNCHRONOUS
+Hace que las escrituras en este sistema de ficheros sean síncronos
+(como si se hubiera especificado la opción
+.B O_SYNC
+en
+.BR open (2)
+para todos los ficheros abiertos en este sistema de ficheros).
+.PP
+A partir de la versión 2.4 de Linux, las opciones
+.BR MS_NODEV ", " MS_NOEXEC " y " MS_NOSUID
+se pueden configurar individualmente para cada punto de montaje.
+.PP
+El argumento
+.IR datos
+es interpretado por los diferentes sistemas de ficheros. Normalmente
+es una cadena de opciones separadas por comas que entiende este
+sistema de ficheros.
+Consulte
+.BR mount (8)
+para ver más detalles de las opciones disponibles para cada tipo de
+sistema de ficheros.
+.PP
+.\" Note: the kernel naming differs from the glibc naming
+.\" umount2 is the glibc name for what the kernel now calls umount
+.\" and umount is the glibc name for oldumount
+La versión 2.1.116 de Linux añadió la llamada al sistema
+.BR umount2 ()
+que, como
+.BR umount (),
+desmonta un destino pero permite especificar
+.I opciones
+adicionales que controlen el comportamiento de la operación:
+.TP
+.B MNT_FORCE
+Fuerza el desmontaje aunque el sistema de ficheros esté ocupado.
+(Desde 2.1.116. Sólo para montajes NFS.)
+.TP
+.B MNT_DETACH
+Realiza un desmontaje «perezoso»: hace que el punto de montaje deje de
+estar disponible para nuevos accesos y realmente realiza el desmontaje
+cuando el punto de montaje deja de estar ocupado. (Desde 2.4.11.)
+.SH "VALOR DEVUELTO"
+En caso de éxito se devuelve 0. En caso de error, \-1, y se da a 
+.I errno
+un valor apropiado.
+.SH ERRORES
+Los valores de error dados más abajo son independientes del tipo de
+sistema de ficheros. Cada tipo de sistemas de ficheros puede tener sus
+propios errores especiales y comportamiento. Consulte los fuentes del
+núcleo para los detalles.
+
+.TP
+.B EPERM
+El usuario no es el super-usuario.
+.TP
+.B ENODEV
+.I tipo_sf
+no configurado en el núcleo.
+.TP
+.B ENOTBLK
+.I fuente
+no es un dispositivo de bloques (y se necesitaba un dispositivo).
+.TP
+.B EBUSY
+.I fuente
+ya está montado. O no puede remontarse para lectura exclusiva, porque
+ya contiene ficheros abiertos para escritura.
+O no puede montarse en
+.I destino
+porque
+.I destino
+ya está ocupado (es el directorio de trabajo de alguna tarea, el punto
+de montaje de otro dispositivo, tiene ficheros abiertos, etc.).
+O no puede desmontarse porque está ocupado.
+.TP
+.B EINVAL
+.I fuente
+tiene un superbloque inválido.
+O se ha intentado volver a montar, pero
+.I fuente
+no estaba ya montado en
+.IR destino .
+O se ha intentando mover
+.I fuente
+cuando ésta no es un punto de montaje o es '/'.
+O se ha intentado desmontar, pero
+.I destino
+no era un punto de montaje.
+.TP
+.B ENOTDIR
+El segundo argumento, o un prefijo del primero, no es un
+directorio.
+.TP
+.B EFAULT
+Uno de los argumentos de tipo puntero apunta fuera del espacio de
+direcciones de usuario.
+.TP
+.B ENOMEM
+El núcleo no pudo obtener una página libre para copiar en ella
+nombres de ficheros o datos.
+.TP
+.B ENAMETOOLONG
+Un nombre de ruta era más largo que MAXPATHLEN.
+.TP
+.B ENOENT
+Un nombre de camino estaba vacío o tenía un componente inexistente.
+.TP
+.B ELOOP
+Se han encontrado demasiados enlaces durante la resolución de la ruta.
+O se ha intentado un movimiento
+cuando
+.I destino
+es un descendiente de
+.IR fuente.
+.TP
+.B EACCES
+No se pudo acceder a un componente de una ruta.
+.br
+O se intentó montar un sistema de ficheros para lectura exclusiva sin
+dar la opción MS_RDONLY.
+.br
+O el dispositivo de bloques
+.I fuente
+estaba en un sistema de ficheros montado con la opción MS_NODEV.
+.TP
+.B ENXIO
+El número mayor del dispositivo de bloques
+.I fuente
+está fuera de rango.
+.TP
+.B EMFILE
+(En caso de que no se necesite un dispositivo de bloques:)
+La tabla de dispositivos ficticios está llena.
+.SH "CONFORME A"
+Estas funciones son específicas de Linux y no deberían emplearse en
+programas pretendidamente transportables.
+.SH HISTORIA
+La función
+.B umount
+original se invocaba como \fIumount(dispositivo)\fP y devolvía ENOTBLK
+cuando se invocaba con algo distinto a un dispositivo de bloques.
+En la versión 0.98p4 de Linux se añadió la llamada \fIumount(dir)\fP
+para dar soporte a los dispositivos anónimos.
+En Linux 2.3.99-pre7 se eliminó la llamada \fIumount(dispositivo)\fP,
+dejando sólo \fIumount(dir)\fP (ya que ahora los dispositivos se
+pueden montar en más de un lugar, por lo que especificar el
+dispositivo no es suficiente).
+.LP
+La opción MS_SYNC original se renombró a MS_SYNCHRONOUS en la versión
+1.1.69 cuando se añadió un MS_SYNC diferente a <mman.h>.
+.LP
+Antes de la versión 2.4 de Linux, cualquier intento por ejecutar un
+programa set-UID o set-GID sobre un sistema de ficheros montado con
+.B MS_NOSUID
+fallaba dando el error
+.BR EPERM .
+Desde la versión 2.4, los bits set-UID y set-GID simplemente se
+ignoran de forma silenciosa en este caso.
+.\" The change is in patch-2.4.0-prerelease.
+.SH "VÉASE TAMBIÉN"
+.BR mount (8),
+.BR umount (8)
