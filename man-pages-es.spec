@@ -1,7 +1,7 @@
 Summary: Spanish man pages from the Linux Documentation Project
 Name: man-pages-es
 Version: 1.55
-Release: 20%{?dist}
+Release: 21%{?dist}
 # FIXME: a more complete audit of the various licenses should really be done
 # These man pages come under various copyrights.
 # All are freely distributable when the nroff source is included.
@@ -1711,6 +1711,9 @@ done
 
 
 %changelog
+* Fri Dec 27 2013 Daniel Mach <dmach@redhat.com> - 1.55-21
+- Mass rebuild 2013-12-27
+
 * Wed Feb 13 2013 Jens Petersen <petersen@redhat.com> - 1.55-20
 - revert license tags and add only GPL+ and GPLv2+ and LDP
   (a more detailed license audit of the manpages is really needed)
